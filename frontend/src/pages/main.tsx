@@ -10,7 +10,7 @@ import { ethers } from "ethers";
 import {contractAddress} from "../contracts/ud_contract"
 import {contractABI} from "../contracts/ud_contract"
 import {contractAddress as contractAddressENS} from "../contracts/ens_contract"
-import {contractABI as contractAddressABI} from "../contracts/ens_contract"
+import {contractABI as contractABIens} from "../contracts/ens_contract"
 
 // ENS queries
 const myQuery1 = gql`
@@ -39,9 +39,12 @@ function Main(){
     const [oldDomainInput, setOldDomainInput] = useState("")
     const [domainInput, setDomainInput] = useState("")
 
-    const [results, setResults] = useState<{name: string, extension: string, available: boolean, price: number, date: Date, metadata: string}[]>([])
+    const [results, setResults] = useState<{name: string, extension: string, available: boolean, provider: string, blockchain: string, price: number, renewalPrice: number, startDate: Date, endDate: Date, metadata: string}[]>([])
     const [hasResults, setHasResults] = useState(false)
+
     const [isLoading, setIsLoading] = useState(false)
+    const [isUDloading, setIsUDloading] = useState(false)
+    const [isENSloading, setIsENSloading] = useState(false)
     // get metadata or not
     const [advancedSearch, setAdvancedSearch] = useState(true)
 
@@ -56,13 +59,26 @@ function Main(){
     );
     useEffect(() => {
       if(!hasResults && !isLoading){return;}
-      const onCompleted = (data: any) => {  
+      const onCompleted = async (data: any) => {  
         if(JSON.stringify(data["domains"][0]) != undefined){
-          console.log("ENS - Label Hash: " + (JSON.stringify(data["domains"][0].labelhash)));
+          // console.log("ENS - Label Hash: " + (JSON.stringify(data["domains"][0].labelhash)));
           setENSlabelHash(data["domains"][0].labelhash);
         }
         else{
-          console.log(ENSdomainInput + " is free.");
+          let renewal = 5;
+          if(ENSdomainInput.substring(0, ENSdomainInput.length-4).length == 4){
+            renewal = 160;
+          }
+          else if(ENSdomainInput.substring(0, ENSdomainInput.length-4).length == 3){
+            renewal = 640;
+          }
+          await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
+          .then((res) => res.json())
+          .then((data) => {
+             const _price = renewal + parseFloat(data.USD) * 0.006;
+             setResults(prevData => [{name: ENSdomainInput.substring(0, ENSdomainInput.length-4), extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: new Date(), endDate: new Date(), price: _price, renewalPrice: renewal, available: true, metadata: ""}, ...prevData])
+             setIsENSloading(false);
+          });
         }
      };
       const onError = (error: any) => { console.log(error) };
@@ -83,19 +99,32 @@ function Main(){
     );
     useEffect(() => {
       if(!hasResults && !isLoading){return;}
-      const onCompleted = (data: any) => {  
+      const onCompleted = async (data: any) => {  
         console.log(data)
          if(data.registrations.length > 0){
 
             var registration_date = new Date(parseInt(JSON.stringify(data.registrations[0].registrationDate).slice(1, -1)) * 1000);
             var expiry_date = new Date(parseInt(JSON.stringify(data.registrations[0].expiryDate).slice(1, -1)) * 1000);
+            let id = data.registrations[0].registrant.id;
+            let renewal = 5;
+            if(ENSdomainInput.substring(0, ENSdomainInput.length-4).length == 4){
+              renewal = 160;
+            }
+            else if(ENSdomainInput.substring(0, ENSdomainInput.length-4).length == 3){
+              renewal = 640;
+            }
 
-            console.log("Registration Date: " + registration_date.toLocaleDateString("fr"));
-            console.log("Expiry Date: " + expiry_date.toLocaleDateString("fr"));
-            console.log("Registrant address: " + (JSON.stringify(data.registrations[0].registrant.id)));
-
-            setResults(prevData => [...prevData, {name: ENSdomainInput.substring(0, ENSdomainInput.length-4), extension:".eth", date: registration_date, price: 10, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + data.registrations[0].registrant.id}])
-         }
+            await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
+            .then((res) => res.json())
+            .then((data) => {
+              const _price = renewal + parseFloat(data.USD) * 0.006;
+              setResults(prevData => [{name: ENSdomainInput.substring(0, ENSdomainInput.length-4), extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: registration_date, endDate: expiry_date, price: _price, renewalPrice: renewal, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + id}, ...prevData])
+              setIsENSloading(false);
+            });
+            // console.log("Registration Date: " + registration_date.toLocaleDateString("fr"));
+            // console.log("Expiry Date: " + expiry_date.toLocaleDateString("fr"));
+            // console.log("Registrant address: " + (JSON.stringify(data.registrations[0].registrant.id)));
+          }
       };
       const onError = (error2: any) => { console.log(error2) };
       if (onCompleted || onError) {
@@ -111,32 +140,47 @@ function Main(){
 
         if(domainInput != oldDomainInput){
           setOldDomainInput(domainInput)
-          if(typeof domainInput === 'string' && domainInput.trim() !== ''){
+          const regex = new RegExp("^[A-Za-z0-9]+[a-zA-Z0-9_.-]*$")
+          if(regex.test(domainInput)){
 
               setIsLoading(true);
+              setIsENSloading(true);
+              setIsUDloading(true);
+
               setResults([]);
-              checkAllUD(domainInput, setResults, advancedSearch)   
-              setENSdomainInput(domainInput+".eth")
+              checkAllUD(domainInput, setResults, advancedSearch, setIsUDloading);
+              if(domainInput.length >= 3){ // min 3 char ENS
+                 setENSdomainInput(domainInput+".eth");
+              }
+              else{
+                setIsENSloading(false);
+              }
           }
           else{
-              alert("ERROR: The search input is empty.")
+              alert("ERROR: The search input is empty or contains invalid characters.")
           }
         }
     }
 
-    const buy =async () => {
+    const buy =async (index: number) => {
 
+      const domain = results[index];
       // @ts-ignore
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const myAddress = await signer.getAddress();
       const { chainId } = await provider.getNetwork()
       // @ts-ignore
-      const nftContract = new ethers.Contract(contractAddress, contractABI, signer); 
+      const UDcontract = new ethers.Contract(contractAddress, contractABI, signer); 
+      const ENScontract = new ethers.Contract(contractAddressENS, contractABIens, signer); 
 
-      if(chainId != 137){
+      if(domain.blockchain == "Polygon" && chainId != 137){
          alert("ERROR: Switch to Polygon network.")
          return;
+      }
+      if(domain.blockchain == "Ethereum" && chainId != 1){
+        alert("ERROR: Switch to Ethereum network.")
+        return;
       }
 
       provider.getBalance(myAddress).then((balance) => {
@@ -146,7 +190,7 @@ function Main(){
           alert("ERROR: Your wallet is empty.")
           return;
         }
-       });
+      });
     }
 
     useEffect(() => {
@@ -158,9 +202,11 @@ function Main(){
     useEffect(() => {
     if(ignoreFirst){setIgnoreFirst(false); return;}
         if(results.length > 1){ // more than ENS result only
-          setIsLoading(false)
-          setHasResults(true)
-          console.log(results)
+          if(!isENSloading && !isUDloading){
+            setIsLoading(false)
+            setHasResults(true)
+            console.log(results)
+          }
         }
     },[results])
 
@@ -228,27 +274,42 @@ function Main(){
                         <thead>
                           <tr className="bg-primary text-center">
                             <th
-                              className="w-1/6 border-l border-transparent py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
+                              className="w-1/8 border-l border-transparent py-4 px-0 text-lg font-semibold text-white lg:py-7 lg:px-0"
                             >
                               TLD
                             </th>
                             <th
-                              className="w-1/6 py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
+                              className="w-1/8 py-4 px-0 text-lg font-semibold text-white lg:py-7 lg:px-0"
                             >
-                              Duration
+                              Provider
                             </th>
                             <th
-                              className="w-1/6 py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
+                              className="w-1/8 py-4 px-0 text-lg font-semibold text-white lg:py-7 lg:px-0"
+                            >
+                              Blockchain
+                            </th>
+                            <th
+                              className="w-1/8 py-4 px-0 text-lg font-semibold text-white lg:py-7 lg:px-0"
+                            >
+                              Start
+                            </th>
+                            <th
+                              className="w-1/8 py-4 px-0 text-lg font-semibold text-white lg:py-7 lg:px-0"
+                            >
+                              Expiration
+                            </th>
+                            <th
+                              className="w-1/8 py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
                             >
                               Price
                             </th>
                             <th
-                              className="w-1/6 py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
+                              className="w-1/8 py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
                             >
                               Renewal
                             </th>
                             <th
-                              className="w-1/6 border-r border-transparent py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
+                              className="w-1/8 border-r border-transparent py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
                             >
                               Register
                             </th>
@@ -263,26 +324,41 @@ function Main(){
                                     {res.name + res.extension}
                                 </td>
                                 <td
+                                    className="text-dark border-b border-l border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium"
+                                >
+                                    {res.provider}
+                                </td>
+                                <td
+                                    className="text-dark border-b border-l border-[#E8E8E8] bg-[#F3F6FF] py-5 px-2 text-center text-base font-medium"
+                                >
+                                    {res.blockchain}
+                                </td>
+                                <td
                                     className="text-dark border-b border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium"
                                 >
-                                    Infinite
+                                    {(res.provider != "UD" && res.startDate.getDay() != res.endDate.getDay()) ? res.startDate.toLocaleDateString("fr") : "/"}
                                 </td>
                                 <td
                                     className="text-dark border-b border-[#E8E8E8] bg-[#F3F6FF] py-5 px-2 text-center text-base font-medium"
-                                >                                  
-                                    {res.available ? ("$"+res.price.toString()) : "/"}
+                                >
+                                    {(res.provider != "UD" && res.startDate.getDay() != res.endDate.getDay()) ? res.endDate.toLocaleDateString("fr") : "/"}
                                 </td>
                                 <td
                                     className="text-dark border-b border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium"
+                                >                                  
+                                    {res.available ? ( res.provider == "ENS" ? ("$"+res.price.toFixed(2).toString()) : ("$"+res.price.toString()) ): "/"}
+                                </td>
+                                <td
+                                    className="text-dark border-b border-[#E8E8E8] bg-[#F3F6FF] py-5 px-2 text-center text-base font-medium"
                                 >
-                                    /
+                                    { res.available ? (res.provider == "ENS" ? ("$"+res.renewalPrice.toString()) : "/") : "/"}
                                 </td>
                                 <td
                                     className="text-dark border-b border-r border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium"
                                 >
                                     {res.available ?
                                     <a
-                                    onClick={buy}
+                                    onClick={() => buy(index)}
                                     className="cursor-pointer border-primary text-primary hover:bg-primary inline-block rounded border py-2 px-6 hover:border-gray-900"
                                     >
                                     Buy

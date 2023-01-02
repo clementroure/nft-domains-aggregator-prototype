@@ -20,11 +20,11 @@ const checkSpecificUD = (domainName: string) => {
   resolve(domainName, 'ETH');
 }
 
-const checkAllUD = (domainName: string, setResults: any, advancedSearch: boolean) => {
+const checkAllUD = (domainName: string, setResults: any, advancedSearch: boolean, setIsUDloading: any) => {
 
     const UDVerifyDisponibility = () => {
 
-      let _results: {name: string, extension: string, available: boolean, price: number, date: Date, metadata: string}[] = []
+      let _results: {name: string, extension: string, available: boolean, provider: string, blockchain: string, price: number, renewalPrice: number, startDate: Date, endDate: Date, metadata: string}[] = []
 
       fetch(`https://unstoppabledomains.com/api/domain/search?q=${domainName}`)
       .then((res) => res.json())
@@ -46,20 +46,21 @@ const checkAllUD = (domainName: string, setResults: any, advancedSearch: boolean
               var token_id = data.tokenId;
 
               if(token_id != null){
-                _results.push({name: name, extension: extension, available: _available, price: _price, date: new Date(), metadata: extension != ".crypto" ? "https://opensea.io/assets/matic/0xa9a6a3626993d487d2dbda3173cf58ca1a9d9e9f/"+token_id : "https://opensea.io/assets/ethereum/0xd1e5b0ff1287aa9f9a268759062e4ab08b9dacbe/"+token_id})
+                _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: -1, startDate: new Date(), endDate: new Date(), metadata: extension != ".crypto" ? "https://opensea.io/assets/matic/0xa9a6a3626993d487d2dbda3173cf58ca1a9d9e9f/"+token_id : "https://opensea.io/assets/ethereum/0xd1e5b0ff1287aa9f9a268759062e4ab08b9dacbe/"+token_id})
               }
               else{
-                _results.push({name: name, extension: extension, available: _available, price: _price, date: new Date(), metadata: ""})
+                _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: -1, startDate: new Date(), endDate: new Date(), metadata: ""})
               }
             });
           }
           else{
 
-            _results.push({name: name, extension: extension, available: _available, price: _price, date: new Date(), metadata: ""})
+            _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: -1, startDate: new Date(), endDate: new Date(),  metadata: ""})
           }
         }
 
         setResults((prevData: any) => [...prevData, ..._results]);
+        setIsUDloading(false);
         
       })
       .catch((err) => {
