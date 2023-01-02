@@ -36,8 +36,10 @@ registrations(where: {id: $labelHash})
 
 function Main(){
 
+    const [oldDomainInput, setOldDomainInput] = useState("")
     const [domainInput, setDomainInput] = useState("")
-    const [results, setResults] = useState<{name: string, extension: string, avlailable: boolean, price: number, date: Date, metadata: string}[]>([])
+
+    const [results, setResults] = useState<{name: string, extension: string, available: boolean, price: number, date: Date, metadata: string}[]>([])
     const [hasResults, setHasResults] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     // get metadata or not
@@ -53,6 +55,7 @@ function Main(){
       },
     );
     useEffect(() => {
+      if(!hasResults && !isLoading){return;}
       const onCompleted = (data: any) => {  
         if(JSON.stringify(data["domains"][0]) != undefined){
           console.log("ENS - Label Hash: " + (JSON.stringify(data["domains"][0].labelhash)));
@@ -79,7 +82,7 @@ function Main(){
       },
     );
     useEffect(() => {
-      console.log(ENSlabelHash)
+      if(!hasResults && !isLoading){return;}
       const onCompleted = (data: any) => {  
         console.log(data)
          if(data.registrations.length > 0){
@@ -90,6 +93,8 @@ function Main(){
             console.log("Registration Date: " + registration_date.toLocaleDateString("fr"));
             console.log("Expiry Date: " + expiry_date.toLocaleDateString("fr"));
             console.log("Registrant address: " + (JSON.stringify(data.registrations[0].registrant.id)));
+
+            setResults(prevData => [...prevData, {name: ENSdomainInput.substring(0, ENSdomainInput.length-4), extension:".eth", date: registration_date, price: 10, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + data.registrations[0].registrant.id}])
          }
       };
       const onError = (error2: any) => { console.log(error2) };
@@ -104,14 +109,18 @@ function Main(){
 
     const searchDomain = () => {
 
-        if(typeof domainInput === 'string' && domainInput.trim() !== ''){
+        if(domainInput != oldDomainInput){
+          setOldDomainInput(domainInput)
+          if(typeof domainInput === 'string' && domainInput.trim() !== ''){
 
-            setIsLoading(true);
-            checkAllUD(domainInput, setResults, advancedSearch)   
-            setENSdomainInput(domainInput+".eth")
-        }
-        else{
-            alert("ERROR: The search input is empty.")
+              setIsLoading(true);
+              setResults([]);
+              checkAllUD(domainInput, setResults, advancedSearch)   
+              setENSdomainInput(domainInput+".eth")
+          }
+          else{
+              alert("ERROR: The search input is empty.")
+          }
         }
     }
 
@@ -148,9 +157,11 @@ function Main(){
     const [ignoreFirst, setIgnoreFirst] = useState(true)
     useEffect(() => {
     if(ignoreFirst){setIgnoreFirst(false); return;}
-        setIsLoading(false)
-        setHasResults(true)
-        console.log(results)
+        if(results.length > 1){ // more than ENS result only
+          setIsLoading(false)
+          setHasResults(true)
+          console.log(results)
+        }
     },[results])
 
     const [isSettingsVisible, setIsSettingsVisible] = useState(false)
@@ -171,16 +182,16 @@ function Main(){
             <nav className="px-2 rounded-b-lg sm:px-4 h-16 py-2.5 bg-gray-900 fixed w-full top-0 left-0 border-b border-gray-700  bg-clip-padding backdrop-filter backdrop-blur-md bg-opacity-80">
             <div className="container flex flex-wrap items-center justify-between mx-auto relative">
 
-                <p className="text-gray-900 dark:text-gray-50 mt-1 mb-6 text-xl italic font-semibold">NFT Domains</p>
+                <p className="text-gray-50 mt-1 mb-6 text-xl italic font-semibold">NFT Domains</p>
 
                 <button onClick={() => setIsSettingsVisible(!isSettingsVisible)} className="hidden 2xl:inline-flex text-gray-50 mb-4 ml-24 -mr-20 items-center bottom-2.5 bg-gray-900 border-0 border-gray-800 bg-opacity-0 hover:bg-gray-800 hover:bg-opacity-40 font-medium rounded-lg text-sm px-4 py-2" type="button">Settings<svg className="ml-2 w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></button>
                 {isSettingsVisible &&
                 <div ref={settingsRef} className="hidden 2xl:block absolute translate-x-56 mt-24 z-10 w-40 bg-gray-900 border-0 border-gray-800 hover:bg-gray-800 hover:bg-opacity-80 font-medium rounded-lg bg-clip-padding backdrop-filter backdrop-blur-md bg-opacity-80">
-                    <ul className="p-3 space-y-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownCheckboxButton">
+                    <ul className="p-3 space-y-2 text-sm text-gray-200" aria-labelledby="dropdownCheckboxButton">
                       <li>
                         <div className="flex items-center">
-                          <input onChange={(e) => {setAdvancedSearch(e.target.checked);}} type="checkbox" checked={advancedSearch} className="w-4 h-4 text-blue-600 bg-gray-100 rounded border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 focus:ring-0 dark:bg-gray-600 dark:border-gray-500"/>
-                          <label className="ml-2 text-sm font-medium text-gray-900 dark:text-gray-50">Advanced search</label>
+                          <input onChange={(e) => {setAdvancedSearch(e.target.checked);}} type="checkbox" checked={advancedSearch} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-0 bg-gray-600 border-gray-500"/>
+                          <label className="ml-2 text-sm font-medium text-gray-50">Advanced search</label>
                         </div>
                       </li>
                     </ul>
@@ -188,12 +199,12 @@ function Main(){
                 }
 
                 <div className="w-6/12 sm:w-4/12 mx-auto"> 
-                    <label className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white">Search</label>
+                    <label className="mb-2 text-sm font-medium sr-only text-white">Search</label>
                     <div className="relative ">
                         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <svg aria-hidden="true" className="w-5 h-5 text-gray-500 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            <svg aria-hidden="true" className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         </div>
-                        <input value={domainInput} onChange={(e) => setDomainInput(e.target.value)} minLength={1} maxLength={50} type="search" id="default-search" className="-mt-4 block w-full p-4 pl-10 text-sm text-gray-900 border-gray-500 rounded-lg bg-gray-900 dark:border-gray-800 dark:placeholder-gray-200 dark:text-white dark:focus:ring-blue-500  bg-opacity-10" placeholder="Search Domain Name..." required/>
+                        <input value={domainInput} onChange={(e) => setDomainInput(e.target.value)} minLength={1} maxLength={50} type="search" id="default-search" className="-mt-4 block w-full p-4 pl-10 text-sm rounded-lg bg-gray-900 border-gray-800 placeholder-gray-200 text-white focus:ring-blue-500  bg-opacity-10" placeholder="Search Domain Name..." required/>
                         <button onClick={searchDomain} type="submit" className="text-white absolute right-2.5 bottom-2.5 bg-gray-900 border-0 border-gray-800 bg-opacity-0 hover:bg-gray-800 hover:bg-opacity-40 font-medium rounded-lg text-sm px-4 py-2 ">Search</button>
                     </div>  
                 </div>

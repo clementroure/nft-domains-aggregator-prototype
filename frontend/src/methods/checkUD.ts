@@ -59,7 +59,7 @@ const checkAllUD = (domainName: string, setResults: any, advancedSearch: boolean
           }
         }
 
-        setResults(_results)
+        setResults((prevData: any) => [...prevData, ..._results]);
         
       })
       .catch((err) => {
