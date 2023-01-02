@@ -1,4 +1,3 @@
-import React, { useState } from "react";
 import '@rainbow-me/rainbowkit/styles.css';
 import {
   getDefaultWallets,
@@ -35,15 +34,16 @@ import Error404 from "./pages/Error404";
 const myDarkTheme = merge(darkTheme(), {
   colors: {
     connectButtonBackground: 'rgba(52, 52, 52, 0)',
-    modalText: localStorage.getItem("theme") == "dark" ? '#fbfbfc' : '#282c31',
-    accentColor: '#2591b7',
-    connectButtonText: '#cbd5e1',
+    // accentColor: '#2591b7',
+    // connectButtonText: '#cbd5e1',
     connectButtonBackgroundError: '#a40000',
   },
 } as Theme);
 const myLightTheme = merge(lightTheme(), {
   colors: {
-     
+    connectButtonBackground: 'rgba(52, 52, 52, 0)',
+    connectButtonBackgroundError: '#a40000',
+    connectButtonText: 'rgba(255, 255, 255, 255)',
   },
 } as Theme);
 // Blockchains used
@@ -90,7 +90,7 @@ function App() {
   return (
     <ApolloProvider client={client}>
         <WagmiConfig client={wagmiClient}>
-            <RainbowKitProvider chains={chains} theme={lightTheme()}>
+            <RainbowKitProvider chains={chains} theme={myLightTheme}>
               <BrowserRouter>
                 <Routes>
                     <Route path="/" element={<Main />}/>
