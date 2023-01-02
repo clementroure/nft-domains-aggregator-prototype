@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { checkAllUD, checkSpecificUD } from "../methods/checkUD";
 import { gql, useQuery } from "@apollo/client";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -40,22 +40,75 @@ function Main(){
     const [results, setResults] = useState<{name: string, extension: string, avlailable: boolean, price: number, date: Date, metadata: string}[]>([])
     const [hasResults, setHasResults] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    // get metadata or not
+    const [advancedSearch, setAdvancedSearch] = useState(true)
 
-    // ENS call
-    // let { data, loading, error } = useQuery(myQuery1, {
-    //     variables: {
-    //         domainName: domainInput,
-    //     },
-    // },
-    // );
+    const [ENSdomainInput, setENSdomainInput] = useState("")
+    const [ENSlabelHash, setENSlabelHash] = useState("")
+    // ENS call -> labelhash
+    let { data, loading, error } = useQuery(myQuery1, {
+        variables: {
+            domainName: ENSdomainInput,
+        },
+      },
+    );
+    useEffect(() => {
+      const onCompleted = (data: any) => {  
+        if(JSON.stringify(data["domains"][0]) != undefined){
+          console.log("ENS - Label Hash: " + (JSON.stringify(data["domains"][0].labelhash)));
+          setENSlabelHash(data["domains"][0].labelhash);
+        }
+        else{
+          console.log(ENSdomainInput + " is free.");
+        }
+     };
+      const onError = (error: any) => { console.log(error) };
+      if (onCompleted || onError) {
+        if (onCompleted && !loading && !error) {
+          onCompleted(data);
+        } else if (onError && !loading && error) {
+          onError(error);
+        }
+      }
+    }, [loading, data, error]);
+    // ENS Call 2 -> metadata
+    let { data : data2, loading : loading2, error : error2 } = useQuery(myQuery2, {
+        variables: {
+            labelHash: ENSlabelHash,
+        },
+      },
+    );
+    useEffect(() => {
+      console.log(ENSlabelHash)
+      const onCompleted = (data: any) => {  
+        console.log(data)
+         if(data.registrations.length > 0){
+
+            var registration_date = new Date(parseInt(JSON.stringify(data.registrations[0].registrationDate).slice(1, -1)) * 1000);
+            var expiry_date = new Date(parseInt(JSON.stringify(data.registrations[0].expiryDate).slice(1, -1)) * 1000);
+
+            console.log("Registration Date: " + registration_date.toLocaleDateString("fr"));
+            console.log("Expiry Date: " + expiry_date.toLocaleDateString("fr"));
+            console.log("Registrant address: " + (JSON.stringify(data.registrations[0].registrant.id)));
+         }
+      };
+      const onError = (error2: any) => { console.log(error2) };
+      if (onCompleted || onError) {
+        if (onCompleted && !loading2 && !error2) {
+          onCompleted(data2);
+        } else if (onError && !loading2 && error2) {
+          onError(error2);
+        }
+      }
+    }, [loading2, data2, error2]);
 
     const searchDomain = () => {
 
         if(typeof domainInput === 'string' && domainInput.trim() !== ''){
 
             setIsLoading(true);
-            checkAllUD(domainInput, setResults)   
-            // checkENS("clement.eth");
+            checkAllUD(domainInput, setResults, advancedSearch)   
+            setENSdomainInput(domainInput+".eth")
         }
         else{
             alert("ERROR: The search input is empty.")
@@ -75,20 +128,16 @@ function Main(){
       if(chainId != 137){
          alert("ERROR: Switch to Polygon network.")
          return;
-
       }
 
       provider.getBalance(myAddress).then((balance) => {
         // convert a currency unit from wei to ether
         const balanceInEth = ethers.utils.formatEther(balance)
-        console.log(`balance: ${balanceInEth}`)
-
         if(balanceInEth == "0.0"){
           alert("ERROR: Your wallet is empty.")
           return;
         }
        });
-
     }
 
     useEffect(() => {
@@ -99,28 +148,44 @@ function Main(){
     const [ignoreFirst, setIgnoreFirst] = useState(true)
     useEffect(() => {
     if(ignoreFirst){setIgnoreFirst(false); return;}
-
         setIsLoading(false)
         setHasResults(true)
         console.log(results)
-
-        // ENS
-        // if(JSON.stringify(data["domains"][0]) != undefined){
-
-        //     console.log("Label Hash: " + (JSON.stringify(data["domains"][0])));
-        // }
-        // else{
-        //     console.log("this domain is available")
-        // }
-
     },[results])
+
+    const [isSettingsVisible, setIsSettingsVisible] = useState(false)
+    const settingsRef = useRef<HTMLInputElement>(null);
+     // Handle Outside Click
+     useEffect(() => {
+      document.addEventListener("click", handleClickOutside, true)
+    },[]);
+    const handleClickOutside = (e:any) => {
+        if(!settingsRef.current?.contains(e.target)){
+            // click outside button
+            setIsSettingsVisible(false)
+        }
+    }
 
     return (
         <div className='grid place-items-center'>
-            <nav className="px-2 sm:px-4 h-16 py-2.5 bg-gray-900 fixed w-full top-0 left-0 border-b border-gray-700  bg-clip-padding backdrop-filter backdrop-blur-md bg-opacity-80">
-            <div className="container flex flex-wrap items-center justify-between mx-auto">
+            <nav className="px-2 rounded-b-lg sm:px-4 h-16 py-2.5 bg-gray-900 fixed w-full top-0 left-0 border-b border-gray-700  bg-clip-padding backdrop-filter backdrop-blur-md bg-opacity-80">
+            <div className="container flex flex-wrap items-center justify-between mx-auto relative">
 
                 <p className="text-gray-900 dark:text-gray-50 mt-1 mb-6 text-xl italic font-semibold">NFT Domains</p>
+
+                <button onClick={() => setIsSettingsVisible(!isSettingsVisible)} className="hidden 2xl:inline-flex text-gray-50 mb-4 ml-24 -mr-20 items-center bottom-2.5 bg-gray-900 border-0 border-gray-800 bg-opacity-0 hover:bg-gray-800 hover:bg-opacity-40 font-medium rounded-lg text-sm px-4 py-2" type="button">Settings<svg className="ml-2 w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></button>
+                {isSettingsVisible &&
+                <div ref={settingsRef} className="hidden 2xl:block absolute translate-x-56 mt-24 z-10 w-40 bg-gray-900 border-0 border-gray-800 hover:bg-gray-800 hover:bg-opacity-80 font-medium rounded-lg bg-clip-padding backdrop-filter backdrop-blur-md bg-opacity-80">
+                    <ul className="p-3 space-y-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownCheckboxButton">
+                      <li>
+                        <div className="flex items-center">
+                          <input onChange={(e) => {setAdvancedSearch(e.target.checked);}} type="checkbox" checked={advancedSearch} className="w-4 h-4 text-blue-600 bg-gray-100 rounded border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 focus:ring-0 dark:bg-gray-600 dark:border-gray-500"/>
+                          <label className="ml-2 text-sm font-medium text-gray-900 dark:text-gray-50">Advanced search</label>
+                        </div>
+                      </li>
+                    </ul>
+                </div>
+                }
 
                 <div className="w-6/12 sm:w-4/12 mx-auto"> 
                     <label className="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white">Search</label>
@@ -133,7 +198,7 @@ function Main(){
                     </div>  
                 </div>
                 
-                <div className="mb-3.5 invisible sm:visible">
+                <div className="mb-3.5 invisible lg:visible">
                   <ConnectButton />
                 </div>
 
@@ -164,7 +229,7 @@ function Main(){
                             <th
                               className="w-1/6 py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
                             >
-                              Registration
+                              Price
                             </th>
                             <th
                               className="w-1/6 py-4 px-3 text-lg font-semibold text-white lg:py-7 lg:px-4"
@@ -227,7 +292,7 @@ function Main(){
                                     </>
                                     :
                                     <>
-                                    Protected
+                                    {advancedSearch ? "Protected" : "Taken"}
                                     </>
                                     }
                                     </>
