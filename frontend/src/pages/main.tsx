@@ -11,6 +11,7 @@ import {contractAddress} from "../contracts/ud_contract"
 import {contractABI} from "../contracts/ud_contract"
 import {contractAddress as contractAddressENS} from "../contracts/ens_contract"
 import {contractABI as contractABIens} from "../contracts/ens_contract"
+import axios from "axios";
 
 // ENS queries
 const myQuery1 = gql`
@@ -29,6 +30,9 @@ registrations(where: {id: $labelHash})
     expiryDate
     registrant {
     id
+    }
+    events {
+      transactionID
     }
 }
 }
@@ -65,18 +69,19 @@ function Main(){
           setENSlabelHash(data["domains"][0].labelhash);
         }
         else{
+          const name = ENSdomainInput.substring(0, ENSdomainInput.length-4);
           let renewal = 5;
-          if(ENSdomainInput.substring(0, ENSdomainInput.length-4).length == 4){
+          if(name.length == 4){
             renewal = 160;
           }
-          else if(ENSdomainInput.substring(0, ENSdomainInput.length-4).length == 3){
+          else if(name.length == 3){
             renewal = 640;
           }
           await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
           .then((res) => res.json())
           .then((data) => {
              const _price = renewal + parseFloat(data.USD) * 0.006;
-             setResults(prevData => [{name: ENSdomainInput.substring(0, ENSdomainInput.length-4), extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: new Date(), endDate: new Date(), price: _price, renewalPrice: renewal, available: true, metadata: ""}, ...prevData])
+             setResults(prevData => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: new Date(), endDate: new Date(), price: _price, renewalPrice: renewal, available: true, metadata: ""}, ...prevData])
              setIsENSloading(false);
           });
         }
@@ -103,22 +108,32 @@ function Main(){
         console.log(data)
          if(data.registrations.length > 0){
 
+            const name = ENSdomainInput.substring(0, ENSdomainInput.length-4);
+
             var registration_date = new Date(parseInt(JSON.stringify(data.registrations[0].registrationDate).slice(1, -1)) * 1000);
             var expiry_date = new Date(parseInt(JSON.stringify(data.registrations[0].expiryDate).slice(1, -1)) * 1000);
-            let id = data.registrations[0].registrant.id;
+            let ownerAddress = data.registrations[0].registrant.id;
+            let transactionID = data.registrations[0].events[0].transactionID;
+
             let renewal = 5;
-            if(ENSdomainInput.substring(0, ENSdomainInput.length-4).length == 4){
+            if(name.length == 4){
               renewal = 160;
             }
-            else if(ENSdomainInput.substring(0, ENSdomainInput.length-4).length == 3){
+            else if(name.length == 3){
               renewal = 640;
             }
+
+            // get tokenID from domain.eth -> https://docs.ens.domains/dapp-developer-guide/ens-as-nft
+            const BigNumber = ethers.BigNumber
+            const utils = ethers.utils
+            const labelHash = utils.keccak256(utils.toUtf8Bytes(name))
+            const tokenId = BigNumber.from(labelHash).toString()
 
             await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
             .then((res) => res.json())
             .then((data) => {
               const _price = renewal + parseFloat(data.USD) * 0.006;
-              setResults(prevData => [{name: ENSdomainInput.substring(0, ENSdomainInput.length-4), extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: registration_date, endDate: expiry_date, price: _price, renewalPrice: renewal, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + id}, ...prevData])
+              setResults(prevData => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: registration_date, endDate: expiry_date, price: _price, renewalPrice: renewal, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + tokenId}, ...prevData]) // or link to etherscan tx
               setIsENSloading(false);
             });
             // console.log("Registration Date: " + registration_date.toLocaleDateString("fr"));
@@ -175,21 +190,66 @@ function Main(){
       const ENScontract = new ethers.Contract(contractAddressENS, contractABIens, signer); 
 
       if(domain.blockchain == "Polygon" && chainId != 137){
-         alert("ERROR: Switch to Polygon network.")
-         return;
+        try{
+          // @ts-ignore
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x89' }], // chainId must be in HEX with 0x in front
+          });
+        }
+        catch(e){
+          // @ts-ignore
+          window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+                chainId: "0x89",
+                rpcUrls: ["https://rpc-mainnet.matic.network/"],
+                chainName: "Matic Mainnet",
+                nativeCurrency: {
+                    name: "MATIC",
+                    symbol: "MATIC",
+                    decimals: 18
+                },
+                blockExplorerUrls: ["https://polygonscan.com/"]
+              }]
+          });
+          // @ts-ignore
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x89' }],
+          });
+        }
+        return;
       }
       if(domain.blockchain == "Ethereum" && chainId != 1){
-        alert("ERROR: Switch to Ethereum network.")
+        // @ts-ignore
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x1' }],
+        });
         return;
       }
 
-      provider.getBalance(myAddress).then((balance) => {
-        // convert a currency unit from wei to ether
-        const balanceInEth = ethers.utils.formatEther(balance)
-        if(balanceInEth == "0.0"){
-          alert("ERROR: Your wallet is empty.")
-          return;
-        }
+      await fetch(domain.blockchain == "Polygon" ? `https://min-api.cryptocompare.com/data/price?fsym=USD&tsyms=MATIC` : `https://min-api.cryptocompare.com/data/price?fsym=USD&tsyms=ETH`)
+      .then((res) => res.json())
+      .then((data) => {
+         const amount = domain.blockchain == "Polygon" ? (data.MATIC * domain.price) : (data.ETH * domain.price);
+         const unit = domain.blockchain == "Polygon" ? "MATIC" : "ETH";
+
+         provider.getBalance(myAddress).then((balance) => {
+          // convert a currency unit from wei to ether
+          const balanceInEth = ethers.utils.formatEther(balance)
+          if(parseFloat(balanceInEth) <= amount){
+            alert("Insufficient Fund: Price is " + (domain.blockchain == "Polygon" ? amount.toFixed(2).toString() : amount.toFixed(4).toString())  + " " + unit);
+            return;
+          }
+
+          // ENS: https://docs.ens.domains/dapp-developer-guide/registering-and-renewing-names
+          // UD: Partner API: https://docs.unstoppabledomains.com/openapi/reference/#operation/PostOrders
+
+          
+
+        });
       });
     }
 
@@ -413,3 +473,27 @@ function Main(){
 }
 
 export default Main;
+
+// OpenSea API retrieve metadata
+
+// const options = {
+//   method: 'GET',
+//   url: 'https://api.opensea.io/api/v1/assets',
+//   params: {
+//     owner: '0xbb46bE602D82F3209B6392130B5BBd40D78df339',
+//     // token_ids: '',
+//     order_direction: 'desc',
+//     asset_contract_address: '0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85',
+//     limit: '1',
+//     include_orders: 'false'
+//   },
+//   headers: {accept: 'application/json'}
+// };  
+// axios
+//   .request(options)
+//   .then(function (response) {
+//     console.log(response.data);
+//   })
+//   .catch(function (error) {
+//     console.error(error);
+//   });
