@@ -147,39 +147,56 @@ function Main(){
 
     const searchDomain = () => {
 
-        if(domainInput != oldDomainInput){
-          setOldDomainInput(domainInput)
-          const regex = new RegExp("^[A-Za-z0-9]+[a-zA-Z0-9_.-]*$")
-          if(regex.test(domainInput)){
+      // format input
+      const formattedDomainInput = (domainInput.replace(/,(\s+)?$/, '')).replace(/\s+/g, "");
+      setDomainInput(formattedDomainInput)
+      // separate multiple domains
+      var domainList = (formattedDomainInput).split(",").map(function(item) {
+        return item.trim();
+      });
+      // test if each domain doesnt contain special chars
+      if(domainList[0].match(/^ *$/) !== null) { alert("Error: The search input is empty."); return; }
+      const regex = new RegExp("^[A-Za-z0-9]+[a-zA-Z0-9-]*$")
+      for(let i=0; i<domainList.length;i++){
+        if(!regex.test(domainList[i])){
+          alert("Error: The search input contains invalid characters.")
+          return;
+        }
+      }
 
-              if(searchForUD || searchForENS){
-                setIsLoading(true);
-                setResults([]);
-              }
+      if(domainList[0] != oldDomainInput){
+        setOldDomainInput(domainList[0])
+        if(!searchForUD && !searchForENS){
+          alert("Error: Both ENS and UD domains are disabled.");
+          return;
+        }
+        if(searchForUD || searchForENS){
+          setIsLoading(true);
+          setResults([]);
+        }
+        if(searchForUD){
+          setIsUDloading(true);
+        }
+        if(searchForENS){
+          setIsENSloading(true);
+        }
 
-              if(searchForUD){
-                setIsUDloading(true);
-                checkAllUD(domainInput, setResults, searchMetadata, setIsUDloading);
-              }
+        for(let i=0; i<domainList.length;i++){
 
-              if(searchForENS){
-                setIsENSloading(true);
-                if(domainInput.length >= 3){ // min 3 char ENS
-                  setENSdomainInput(domainInput+".eth");
-                }
-                else{
-                  setIsENSloading(false);
-                }
-              }
-
-              if(!searchForUD && !searchForENS){
-                alert("Error: Both ENS and UD domains are disabled.")
-              }
+          if(searchForUD){
+            checkAllUD(domainList[i], setResults, searchMetadata, setIsUDloading);
           }
-          else{
-              alert("Error: The search input is empty or contains invalid characters.")
+
+          if(searchForENS){
+            if(domainList[i].length >= 3){ // min 3 char ENS
+              setENSdomainInput(domainList[i]+".eth");
+            }
+            else{
+              setIsENSloading(false);
+            }
           }
         }
+      }
     }
 
     const buy =async (index: number) => {
@@ -339,7 +356,7 @@ function Main(){
                       <li>
                         <div className="flex items-center">
                           <input onChange={(e) => {setSearchMetadata(e.target.checked);}} type="checkbox" checked={searchMetadata} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-0 bg-gray-600 border-gray-500"/>
-                          <label className="ml-2 text-sm font-medium text-gray-50">Advanced search</label>
+                          <label className="ml-2 text-sm font-medium text-gray-50">Get metadata</label>
                         </div>
                       </li>
                       <li>
@@ -364,7 +381,7 @@ function Main(){
                         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                             <svg aria-hidden="true" className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         </div>
-                        <input value={domainInput} onChange={(e) => setDomainInput(e.target.value)} minLength={1} maxLength={50} type="search" id="default-search" className="-mt-4 block w-full p-4 pl-10 text-sm rounded-lg bg-gray-900 border-gray-800 placeholder-gray-200 text-white focus:ring-blue-500  bg-opacity-10" placeholder="Search Domain Name..." required/>
+                        <input value={domainInput} onChange={(e) => setDomainInput(e.target.value)} minLength={1} maxLength={1000} type="search" id="default-search" className="-mt-4 pr-[90px] block w-full p-4 pl-10 text-sm rounded-lg bg-gray-900 border-gray-800 placeholder-gray-200 text-white focus:ring-blue-500  bg-opacity-10" placeholder="Search Domain Name..." required/>
                         <button onClick={searchDomain} type="submit" className="text-white absolute right-2.5 bottom-2.5 bg-gray-900 border-0 border-gray-800 bg-opacity-0 hover:bg-gray-800 hover:bg-opacity-40 font-medium rounded-lg text-sm px-4 py-2 ">Search</button>
                     </div>  
                 </div>
