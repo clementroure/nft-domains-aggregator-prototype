@@ -72,4 +72,61 @@ const checkAllUD = (domainName: string, setResults: any, advancedSearch: boolean
     UDVerifyDisponibility();
 }
 
-export {checkSpecificUD, checkAllUD};
+const registrarUD = async (domain: any) => {
+
+  const resellerId = `${process.env.resellerId}`;
+  const resp = await fetch(
+    `https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer <YOUR_JWT_HERE>'
+      },
+      body: JSON.stringify({
+        payment: {
+          method: 'stripe',
+          properties: {
+            tokenId: 'tok_1FAeVFG8PQyZCUJhJp7emswP'
+          }
+        },
+        security: [
+          {
+            type: 'fingerprintjs',
+            identifier: 'i2udKSvRFcN1wOqGLk3J'
+          }
+        ],
+        domains: [
+          {
+            name: 'matt.dao',
+            ownerAddress: '0x6EC0DEeD30605Bcd19342f3c30201DB263291589',
+            email: 'matt@unstoppabledomains.com',
+            resolution: {
+              'crypto.ETH.address': '0x6EC0DEeD30605Bcd19342f3c30201DB263291589',
+              'crypto.BTC.address': 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
+            },
+            resellerIdentityKey: 'string'
+          }
+        ]
+      })
+    }
+  );
+
+  const data = await resp.json();
+  console.log(data);
+}
+
+// Check if transaction has been mined
+const orderStatus = async (orderNumber: string) => {
+
+  const resellerId = `${process.env.resellerId}`;
+  const resp = await fetch(
+    `https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders/${orderNumber}`,
+    {method: 'GET'}
+  );
+
+  const data = await resp.text();
+  console.log(data);
+}
+
+export {checkSpecificUD, checkAllUD, registrarUD, orderStatus};

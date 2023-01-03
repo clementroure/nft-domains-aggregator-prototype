@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { checkAllUD, checkSpecificUD } from "../methods/checkUD";
+import { checkAllUD, registrarUD } from "../methods/checkUD";
 import { gql, useQuery } from "@apollo/client";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import icon from "../assets/icon.png"
-import { CSVLink, CSVDownload } from "react-csv";
-import { BallTriangle, Circles } from 'react-loading-icons'
+import { CSVLink } from "react-csv";
 import Grid from "react-loading-icons/dist/esm/components/grid";
 import { ethers } from "ethers";
-import {contractAddress} from "../contracts/ud_contract"
-import {contractABI} from "../contracts/ud_contract"
-import {contractAddress as contractAddressENS} from "../contracts/ens_contract"
-import {contractABI as contractABIens} from "../contracts/ens_contract"
-import axios from "axios";
+import {contractAddress as contractAddressENS} from "../contracts/ens/ens_registrar_controller"
+import {contractABI as contractABIens} from "../contracts/ens/ens_registrar_controller"
 
 // ENS queries
 const myQuery1 = gql`
@@ -23,19 +19,19 @@ const myQuery1 = gql`
   }
 `;
 const myQuery2 = gql`
-query domains($labelHash : String!) {
-registrations(where: {id: $labelHash}) 
-{
-    registrationDate
-    expiryDate
-    registrant {
-    id
+  query domains($labelHash : String!) {
+    registrations(where: {id: $labelHash}) 
+    {
+      registrationDate
+      expiryDate
+      registrant {
+        id
+      }
+      events {
+        transactionID
+      }
     }
-    events {
-      transactionID
-    }
-}
-}
+  }
 `;
 
 function Main(){
@@ -105,7 +101,7 @@ function Main(){
     useEffect(() => {
       if(!hasResults && !isLoading){return;}
       const onCompleted = async (data: any) => {  
-        console.log(data)
+        //console.log(data)
          if(data.registrations.length > 0){
 
             const name = ENSdomainInput.substring(0, ENSdomainInput.length-4);
@@ -185,9 +181,6 @@ function Main(){
       const signer = provider.getSigner();
       const myAddress = await signer.getAddress();
       const { chainId } = await provider.getNetwork()
-      // @ts-ignore
-      const UDcontract = new ethers.Contract(contractAddress, contractABI, signer); 
-      const ENScontract = new ethers.Contract(contractAddressENS, contractABIens, signer); 
 
       if(domain.blockchain == "Polygon" && chainId != 137){
         try{
@@ -243,21 +236,40 @@ function Main(){
             alert("Insufficient Fund: Price is " + (domain.blockchain == "Polygon" ? amount.toFixed(2).toString() : amount.toFixed(4).toString())  + " " + unit);
             return;
           }
+          //// REGISTRATION ////
 
-          // ENS: https://docs.ens.domains/dapp-developer-guide/registering-and-renewing-names
-          // UD: Partner API: https://docs.unstoppabledomains.com/openapi/reference/#operation/PostOrders
+          // ENS: https://docs.ens.domains/dapp-developer-guide/registering-and-renewing-names (smart contract call)
+          if(domain.provider == "ENS"){
 
-          
+            const controller = new ethers.Contract(contractAddressENS, contractABIens, signer); 
+            const register = async (name: string, owner:any, duration:any) => {
+              // Generate a random value to mask our commitment
+              const random = new Uint8Array(32);
+              crypto.getRandomValues(random);
+              const salt = "0x" + Array.from(random).map(b => b.toString(16).padStart(2, "0")).join("");
+              // Submit our commitment to the smart contract
+              const commitment = await controller.makeCommitment(name, owner, salt);
+              const tx = await controller.commit(commitment);
+              // Add 10% to account for price fluctuation; the difference is refunded.
+              const price = (await controller.rentPrice(name, duration)) * 1.1;
+              // Wait 60 seconds before registering
+              setTimeout(async () => {
+                // Submit our registration request
+                await controller.register(name, owner, duration, salt, {value: price});
+              }, 60000);
+            }
 
+            register("clement549", "0x9aD91C2a4E7F1e389074B717B0b4B5713B2759c0", 31536000);
+          }
+          // UD: Partner API: https://docs.unstoppabledomains.com/openapi/reference/#operation/PostOrders (api call)
+          else{
+
+            registrarUD(domain)
+          }
         });
       });
     }
 
-    useEffect(() => {
-        // checkSpecificUD('clement.nft')
-        // checkENS(data);
-    },[])
-    
     const [ignoreFirst, setIgnoreFirst] = useState(true)
     useEffect(() => {
     if(ignoreFirst){setIgnoreFirst(false); return;}
@@ -265,7 +277,7 @@ function Main(){
           if(!isENSloading && !isUDloading){
             setIsLoading(false)
             setHasResults(true)
-            console.log(results)
+            //console.log(results)
           }
         }
     },[results])
@@ -474,7 +486,9 @@ function Main(){
 
 export default Main;
 
-// OpenSea API retrieve metadata
+// OpenSea API 
+// tokenId -> metadata associated
+// => Display all the infos in our page instead of redirecting user to the OpenSea page
 
 // const options = {
 //   method: 'GET',
