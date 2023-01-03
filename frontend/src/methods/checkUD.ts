@@ -20,7 +20,7 @@ const checkSpecificUD = (domainName: string) => {
   resolve(domainName, 'ETH');
 }
 
-const checkAllUD = (domainName: string, setResults: any, advancedSearch: boolean, setIsUDloading: any) => {
+const checkAllUD = (domainName: string, setResults: any, searchMetadata: boolean, setIsUDloading: any) => {
 
     const UDVerifyDisponibility = () => {
 
@@ -38,7 +38,7 @@ const checkAllUD = (domainName: string, setResults: any, advancedSearch: boolean
           const _price = data.exact[i].price != -1 ? data.exact[i].price / 100 : -1
           const _available = data.exact[i].availability
 
-          if(data.exact[i].availability == false && advancedSearch){
+          if(data.exact[i].availability == false && searchMetadata){
 
             await fetch(`https://resolve.unstoppabledomains.com/metadata/${domainName+extension}`)
             .then((res) => res.json())
@@ -72,7 +72,7 @@ const checkAllUD = (domainName: string, setResults: any, advancedSearch: boolean
     UDVerifyDisponibility();
 }
 
-const registrarUD = async (domain: any) => {
+const registrarUD = async (domain: any, myAddress: string, email: string) => {
 
   const resellerId = `${process.env.resellerId}`;
   const resp = await fetch(
@@ -98,12 +98,12 @@ const registrarUD = async (domain: any) => {
         ],
         domains: [
           {
-            name: 'matt.dao',
-            ownerAddress: '0x6EC0DEeD30605Bcd19342f3c30201DB263291589',
-            email: 'matt@unstoppabledomains.com',
+            name: domain.name + domain.extension,
+            ownerAddress: myAddress,
+            email: email,
             resolution: {
-              'crypto.ETH.address': '0x6EC0DEeD30605Bcd19342f3c30201DB263291589',
-              'crypto.BTC.address': 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
+              'crypto.ETH.address': myAddress,
+              //'crypto.BTC.address': 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
             },
             resellerIdentityKey: 'string'
           }

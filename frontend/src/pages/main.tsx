@@ -45,8 +45,10 @@ function Main(){
     const [isLoading, setIsLoading] = useState(false)
     const [isUDloading, setIsUDloading] = useState(false)
     const [isENSloading, setIsENSloading] = useState(false)
-    // get metadata or not
-    const [advancedSearch, setAdvancedSearch] = useState(true)
+    // settings
+    const [searchMetadata, setSearchMetadata] = useState(true) // may increase loading time
+    const [searchForUD, setSearchForUD] = useState(true)
+    const [searchForENS, setSearchForENS] = useState(true)
 
     const [ENSdomainInput, setENSdomainInput] = useState("")
     const [ENSlabelHash, setENSlabelHash] = useState("")
@@ -65,21 +67,21 @@ function Main(){
           setENSlabelHash(data["domains"][0].labelhash);
         }
         else{
-          const name = ENSdomainInput.substring(0, ENSdomainInput.length-4);
-          let renewal = 5;
-          if(name.length == 4){
-            renewal = 160;
-          }
-          else if(name.length == 3){
-            renewal = 640;
-          }
-          await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
-          .then((res) => res.json())
-          .then((data) => {
-             const _price = renewal + parseFloat(data.USD) * 0.006;
-             setResults(prevData => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: new Date(), endDate: new Date(), price: _price, renewalPrice: renewal, available: true, metadata: ""}, ...prevData])
-             setIsENSloading(false);
-          });
+            const name = ENSdomainInput.substring(0, ENSdomainInput.length-4);
+            // @ts-ignore
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = provider.getSigner();
+            const controller = new ethers.Contract(contractAddressENS, contractABIens, signer); 
+            const ethPrice = parseInt((await controller.rentPrice(name, 31536000))._hex, 16) / (10**18);
+
+            await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
+            .then((res) => res.json())
+            .then((data) => {
+              const _price = parseFloat(data.USD) * ethPrice;
+
+              setResults(prevData => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: new Date(), endDate: new Date(), price: _price, renewalPrice: _price, available: true, metadata: ""}, ...prevData])
+              setIsENSloading(false);
+            });
         }
      };
       const onError = (error: any) => { console.log(error) };
@@ -111,30 +113,26 @@ function Main(){
             let ownerAddress = data.registrations[0].registrant.id;
             let transactionID = data.registrations[0].events[0].transactionID;
 
-            let renewal = 5;
-            if(name.length == 4){
-              renewal = 160;
-            }
-            else if(name.length == 3){
-              renewal = 640;
-            }
-
             // get tokenID from domain.eth -> https://docs.ens.domains/dapp-developer-guide/ens-as-nft
             const BigNumber = ethers.BigNumber
             const utils = ethers.utils
             const labelHash = utils.keccak256(utils.toUtf8Bytes(name))
             const tokenId = BigNumber.from(labelHash).toString()
 
+            // @ts-ignore
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = provider.getSigner();
+            const controller = new ethers.Contract(contractAddressENS, contractABIens, signer); 
+            const ethPrice = parseInt((await controller.rentPrice(name, 31536000))._hex, 16) / (10**18);
+
             await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
             .then((res) => res.json())
             .then((data) => {
-              const _price = renewal + parseFloat(data.USD) * 0.006;
-              setResults(prevData => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: registration_date, endDate: expiry_date, price: _price, renewalPrice: renewal, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + tokenId}, ...prevData]) // or link to etherscan tx
+              const _price = parseFloat(data.USD) * ethPrice;
+
+              setResults(prevData => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: registration_date, endDate: expiry_date, price: _price, renewalPrice: _price, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + tokenId}, ...prevData]) // or link to etherscan tx
               setIsENSloading(false);
             });
-            // console.log("Registration Date: " + registration_date.toLocaleDateString("fr"));
-            // console.log("Expiry Date: " + expiry_date.toLocaleDateString("fr"));
-            // console.log("Registrant address: " + (JSON.stringify(data.registrations[0].registrant.id)));
           }
       };
       const onError = (error2: any) => { console.log(error2) };
@@ -154,21 +152,32 @@ function Main(){
           const regex = new RegExp("^[A-Za-z0-9]+[a-zA-Z0-9_.-]*$")
           if(regex.test(domainInput)){
 
-              setIsLoading(true);
-              setIsENSloading(true);
-              setIsUDloading(true);
-
-              setResults([]);
-              checkAllUD(domainInput, setResults, advancedSearch, setIsUDloading);
-              if(domainInput.length >= 3){ // min 3 char ENS
-                 setENSdomainInput(domainInput+".eth");
+              if(searchForUD || searchForENS){
+                setIsLoading(true);
+                setResults([]);
               }
-              else{
-                setIsENSloading(false);
+
+              if(searchForUD){
+                setIsUDloading(true);
+                checkAllUD(domainInput, setResults, searchMetadata, setIsUDloading);
+              }
+
+              if(searchForENS){
+                setIsENSloading(true);
+                if(domainInput.length >= 3){ // min 3 char ENS
+                  setENSdomainInput(domainInput+".eth");
+                }
+                else{
+                  setIsENSloading(false);
+                }
+              }
+
+              if(!searchForUD && !searchForENS){
+                alert("Error: Both ENS and UD domains are disabled.")
               }
           }
           else{
-              alert("ERROR: The search input is empty or contains invalid characters.")
+              alert("Error: The search input is empty or contains invalid characters.")
           }
         }
     }
@@ -238,7 +247,7 @@ function Main(){
           }
           //// REGISTRATION ////
 
-          // ENS: https://docs.ens.domains/dapp-developer-guide/registering-and-renewing-names (smart contract call)
+          // ENS: https://docs.ens.domains/dapp-developer-guide/registering-and-renewing-names (smart contract call) (testnet: Goerli, same address)
           if(domain.provider == "ENS"){
 
             const controller = new ethers.Contract(contractAddressENS, contractABIens, signer); 
@@ -249,22 +258,29 @@ function Main(){
               const salt = "0x" + Array.from(random).map(b => b.toString(16).padStart(2, "0")).join("");
               // Submit our commitment to the smart contract
               const commitment = await controller.makeCommitment(name, owner, salt);
+              console.log(commitment)
               const tx = await controller.commit(commitment);
+              console.log(tx)
               // Add 10% to account for price fluctuation; the difference is refunded.
-              const price = (await controller.rentPrice(name, duration)) * 1.1;
+              const price = Math.round((await controller.rentPrice(name, duration)) * 1.1);
+              console.log(price)
               // Wait 60 seconds before registering
               setTimeout(async () => {
                 // Submit our registration request
-                await controller.register(name, owner, duration, salt, {value: price});
+                try{
+                  await controller.register(name, owner, duration, salt, {value: price});
+                }
+                catch(e){console.log(e)}
               }, 60000);
             }
 
-            register("clement549", "0x9aD91C2a4E7F1e389074B717B0b4B5713B2759c0", 31536000);
+            register(domain.name, myAddress, 31536000); // 1 year
           }
           // UD: Partner API: https://docs.unstoppabledomains.com/openapi/reference/#operation/PostOrders (api call)
           else{
 
-            registrarUD(domain)
+            const email = "clementroure@orange.fr"
+            registrarUD(domain, myAddress, email)
           }
         });
       });
@@ -273,11 +289,25 @@ function Main(){
     const [ignoreFirst, setIgnoreFirst] = useState(true)
     useEffect(() => {
     if(ignoreFirst){setIgnoreFirst(false); return;}
-        if(results.length > 1){ // more than ENS result only
-          if(!isENSloading && !isUDloading){
+        if(searchForENS && searchForUD){
+          if(results.length > 1){ // more than ENS result only
+            if(!isENSloading && !isUDloading){
+              setIsLoading(false)
+              setHasResults(true)
+              //console.log(results)
+            }
+          }
+        }
+        if(searchForENS && !searchForUD){
+          if(!isENSloading){
             setIsLoading(false)
             setHasResults(true)
-            //console.log(results)
+          }
+        }
+        if(!searchForENS && searchForUD){
+          if(!isUDloading){
+            setIsLoading(false)
+            setHasResults(true)
           }
         }
     },[results])
@@ -304,12 +334,24 @@ function Main(){
 
                 <button onClick={() => setIsSettingsVisible(!isSettingsVisible)} className="hidden 2xl:inline-flex text-gray-50 mb-4 ml-24 -mr-20 items-center bottom-2.5 bg-gray-900 border-0 border-gray-800 bg-opacity-0 hover:bg-gray-800 hover:bg-opacity-40 font-medium rounded-lg text-sm px-4 py-2" type="button">Settings<svg className="ml-2 w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></button>
                 {isSettingsVisible &&
-                <div ref={settingsRef} className="hidden 2xl:block absolute translate-x-56 mt-24 z-10 w-40 bg-gray-900 border-0 border-gray-800 hover:bg-gray-800 hover:bg-opacity-80 font-medium rounded-lg bg-clip-padding backdrop-filter backdrop-blur-md bg-opacity-80">
+                <div ref={settingsRef} className="hidden 2xl:block absolute translate-x-56 mt-40 z-10 w-40 bg-gray-900 border-0 border-gray-800 hover:bg-gray-800 hover:bg-opacity-80 font-medium rounded-lg bg-clip-padding backdrop-filter backdrop-blur-md bg-opacity-80">
                     <ul className="p-3 space-y-2 text-sm text-gray-200" aria-labelledby="dropdownCheckboxButton">
                       <li>
                         <div className="flex items-center">
-                          <input onChange={(e) => {setAdvancedSearch(e.target.checked);}} type="checkbox" checked={advancedSearch} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-0 bg-gray-600 border-gray-500"/>
+                          <input onChange={(e) => {setSearchMetadata(e.target.checked);}} type="checkbox" checked={searchMetadata} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-0 bg-gray-600 border-gray-500"/>
                           <label className="ml-2 text-sm font-medium text-gray-50">Advanced search</label>
+                        </div>
+                      </li>
+                      <li>
+                        <div className="flex items-center">
+                          <input onChange={(e) => {setSearchForENS(e.target.checked);}} type="checkbox" checked={searchForENS} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-0 bg-gray-600 border-gray-500"/>
+                          <label className="ml-2 text-sm font-medium text-gray-50">ENS domains</label>
+                        </div>
+                      </li>
+                      <li>
+                        <div className="flex items-center">
+                          <input onChange={(e) => {setSearchForUD(e.target.checked);}} type="checkbox" checked={searchForUD} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-0 bg-gray-600 border-gray-500"/>
+                          <label className="ml-2 text-sm font-medium text-gray-50">UD domains</label>
                         </div>
                       </li>
                     </ul>
@@ -423,7 +465,7 @@ function Main(){
                                 <td
                                     className="text-dark border-b border-[#E8E8E8] bg-[#F3F6FF] py-5 px-2 text-center text-base font-medium"
                                 >
-                                    { res.available ? (res.provider == "ENS" ? ("$"+res.renewalPrice.toString()) : "/") : "/"}
+                                    {res.provider == "ENS" ? ("$"+res.renewalPrice.toFixed(2).toString()) : "/"}
                                 </td>
                                 <td
                                     className="text-dark border-b border-r border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium"
@@ -451,7 +493,7 @@ function Main(){
                                     </>
                                     :
                                     <>
-                                    {advancedSearch ? "Protected" : "Taken"}
+                                    {searchMetadata ? "Protected" : "Taken"}
                                     </>
                                     }
                                     </>
