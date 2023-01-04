@@ -42,7 +42,7 @@ function Main(){
     // Called automatically each time var ENSdomainInput is refreshed
     CheckENS(ENSdomainInput, ensController, isLoading, hasResults, setENSlabelHash, setIsENSloading, setResults, ENSlabelHash);
 
-    const searchDomain = () => {
+    const searchDomain = (e:any) => {
 
       // format input
       const formattedDomainInput = (domainInput.replace(/,(\s+)?$/, '')).replace(/\s+/g, "");
@@ -52,7 +52,7 @@ function Main(){
         return item.trim();
       });
       // test if each domain doesnt contain special chars
-      if(domainList[0].match(/^ *$/) !== null) { alert("Error: The search input is empty."); return; }
+      if(domainList[0].match(/^ *$/) !== null) { return; } else{ e.preventDefault(); }
       const regex = new RegExp("^[A-Za-z0-9]+[a-zA-Z0-9-]*$")
       for(let i=0; i<domainList.length;i++){
         if(!regex.test(domainList[i])){
@@ -300,8 +300,10 @@ function Main(){
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                       <svg aria-hidden="true" className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                   </div>
-                  <input value={domainInput} onChange={(e) => setDomainInput(e.target.value)} minLength={1} maxLength={1000} type="search" id="default-search" className="-mt-4 pr-[90px] block w-full p-4 pl-10 text-sm rounded-lg bg-gray-900 border-gray-800 placeholder-gray-200 text-white focus:ring-blue-500  bg-opacity-10" placeholder="Search Domain Name..." required/>
-                  <button onClick={searchDomain} type="submit" className="text-white absolute right-2.5 bottom-2.5 bg-gray-900 border-0 border-gray-800 bg-opacity-0 hover:bg-gray-800 hover:bg-opacity-40 font-medium rounded-lg text-sm px-4 py-2 ">Search</button>
+                  <form>
+                    <input value={domainInput} onChange={(e) => setDomainInput(e.target.value)} minLength={1} maxLength={1000} type="search" id="default-search" className="-mt-4 pr-[90px] block w-full p-4 pl-10 text-sm rounded-lg bg-gray-900 border-gray-800 placeholder-gray-200 text-white focus:ring-blue-500  bg-opacity-10" placeholder="Search Domain Name..." required/>
+                    <button onClick={(e) => searchDomain(e)} type="submit" className="text-white absolute right-2.5 bottom-2.5 bg-gray-900 border-0 border-gray-800 bg-opacity-0 hover:bg-gray-800 hover:bg-opacity-40 font-medium rounded-lg text-sm px-4 py-2 ">Search</button>
+                  </form>
               </div>  
           </div>
           
