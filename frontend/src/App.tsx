@@ -1,5 +1,6 @@
 import { ApolloProvider, ApolloClient, InMemoryCache } from "@apollo/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { FpjsProvider } from '@fingerprintjs/fingerprintjs-pro-react';
 import Main from "./pages/main";
 import Error404 from "./pages/Error404";
 
@@ -11,14 +12,21 @@ const client = new ApolloClient({
 
 function App() {
   return (
-    <ApolloProvider client={client}>
-        <BrowserRouter>
-          <Routes>
-              <Route path="/" element={<Main />}/>
-              <Route path="*" element={<Error404 />}/>
-            </Routes>
-        </BrowserRouter>
-      </ApolloProvider>
+      <FpjsProvider
+        loadOptions={{
+          apiKey: "dXbE2aGdHysk2rElrKlG",
+          region: "eu"
+        }}
+      >
+        <ApolloProvider client={client}>
+          <BrowserRouter>
+            <Routes>
+                <Route path="/" element={<Main />}/>
+                <Route path="*" element={<Error404 />}/>
+              </Routes>
+          </BrowserRouter>
+        </ApolloProvider>
+      </FpjsProvider>
   );
 }
 

@@ -1,3 +1,5 @@
+import { useVisitorData } from '@fingerprintjs/fingerprintjs-pro-react'
+
 // methode alternative sans API
 const checkSpecificUD = (domainName: string) => {
 
@@ -42,20 +44,20 @@ const checkAllUD = (domainName: string, setResults: any, searchMetadata: boolean
 
             await fetch(`https://resolve.unstoppabledomains.com/metadata/${domainName+extension}`)
             .then((res) => res.json())
-            .then((data) => {
+            .then(async (data) => {
               var token_id = data.tokenId;
 
               if(token_id != null){
-                _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: -1, startDate: new Date(), endDate: new Date(), metadata: extension != ".crypto" ? "https://opensea.io/assets/matic/0xa9a6a3626993d487d2dbda3173cf58ca1a9d9e9f/"+token_id : "https://opensea.io/assets/ethereum/0xd1e5b0ff1287aa9f9a268759062e4ab08b9dacbe/"+token_id})
+                _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: 0, startDate: new Date(), endDate: new Date(), metadata: extension != ".crypto" ? "https://opensea.io/assets/matic/0xa9a6a3626993d487d2dbda3173cf58ca1a9d9e9f/"+token_id : "https://opensea.io/assets/ethereum/0xd1e5b0ff1287aa9f9a268759062e4ab08b9dacbe/"+token_id})
               }
               else{
-                _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: -1, startDate: new Date(), endDate: new Date(), metadata: ""})
+                _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: 0, startDate: new Date(), endDate: new Date(), metadata: ""})
               }
             });
           }
           else{
 
-            _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: -1, startDate: new Date(), endDate: new Date(),  metadata: ""})
+            _results.push({name: name, extension: extension, provider: "UD", blockchain: extension == ".crypto" ? "Ethereum" : "Polygon", available: _available, price: _price, renewalPrice: 0, startDate: new Date(), endDate: new Date(),  metadata: ""})
           }
         }
 
@@ -72,56 +74,73 @@ const checkAllUD = (domainName: string, setResults: any, searchMetadata: boolean
     UDVerifyDisponibility();
 }
 
-const registrarUD = async (domain: any, myAddress: string, email: string) => {
+const registrarUD = async (_domain: any, _myAddress: string, _email: string, _fingerprintData: any, _fingerprintError: any) => {
 
   const resellerId = `${process.env.resellerId}`;
-  const resp = await fetch(
-    `https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer <YOUR_JWT_HERE>'
-      },
-      body: JSON.stringify({
-        payment: {
-          method: 'stripe',
-          properties: {
-            tokenId: 'tok_1FAeVFG8PQyZCUJhJp7emswP'
-          }
-        },
-        security: [
-          {
-            type: 'fingerprintjs',
-            identifier: 'i2udKSvRFcN1wOqGLk3J'
-          }
-        ],
-        domains: [
-          {
-            name: domain.name + domain.extension,
-            ownerAddress: myAddress,
-            email: email,
-            resolution: {
-              'crypto.ETH.address': myAddress,
-              //'crypto.BTC.address': 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
-            },
-            resellerIdentityKey: 'string'
-          }
-        ]
-      })
-    }
-  );
+  const udApiSecret = `${process.env.udApiSecret}`;
 
-  const data = await resp.json();
-  console.log(data);
+  if (_fingerprintData) {
+
+    // get JWS token
+    const _res = await fetch(
+      `https://auth.unstoppabledomains.com/.well-known/jwks.json`,
+      {method: 'GET'}
+    );
+    const jws = await _res.text();
+    console.log(jws)
+
+    const resp = await fetch(
+      //`https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders`,
+      `https://api.ud-sandbox.com/api/v2/resellers/${resellerId}/orders`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${jws}`
+        },
+        body: JSON.stringify({
+          payment: {
+            method: 'free',
+            // properties: {
+            //   tokenId: 'tok_1FAeVFG8PQyZCUJhJp7emswP'
+            // }
+          },
+          security: [
+            {
+              type: 'fingerprintjs',
+              identifier: _fingerprintData.visitorId
+            }
+          ],
+          domains: [
+            {
+              name: _domain.name + _domain.extension,
+              ownerAddress: _myAddress,
+              //email: _email,
+              resolution: {
+                'crypto.ETH.address': _myAddress,
+                //'crypto.BTC.address': 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
+              },
+            }
+          ]
+        })
+      }
+    );
+
+    const result = await resp.json();
+    console.log(result);
+  }
+  else{
+    console.log(_fingerprintError?.message)
+  }
 }
 
 // Check if transaction has been mined
-const orderStatus = async (orderNumber: string) => {
+const orderStatus = async (_orderNumber: string) => {
 
   const resellerId = `${process.env.resellerId}`;
+
   const resp = await fetch(
-    `https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders/${orderNumber}`,
+    `https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders/${_orderNumber}`,
     {method: 'GET'}
   );
 

@@ -7,7 +7,9 @@ import Grid from "react-loading-icons/dist/esm/components/grid";
 import { ethers } from "ethers";
 import {contractAddress as contractAddressENS} from "../contracts/ens/ens_registrar_controller"
 import {contractABI as contractABIens} from "../contracts/ens/ens_registrar_controller"
-import CheckENS from "../methods/checkENS";
+import { getMetadata } from "../methods/apiOpenSea";
+import { useVisitorData } from "@fingerprintjs/fingerprintjs-pro-react";
+import { CheckENS, getENSgasPrice } from "../methods/checkENS";
 const ethereum = window.ethereum;
 
 function Main(){
@@ -18,6 +20,8 @@ function Main(){
     const [domainInput, setDomainInput] = useState("")
     // 1 result obj = 1 line
     const [results, setResults] = useState<{name: string, extension: string, available: boolean, provider: string, blockchain: string, price: number, renewalPrice: number, startDate: Date, endDate: Date, metadata: string}[]>([])
+    // just to update the UI
+    const [resultsUI, setResultsUI] = useState<{isLoading: boolean}[]>([])
     // check if display table
     const [hasResults, setHasResults] = useState(false)
     // loadings
@@ -33,17 +37,32 @@ function Main(){
     const [ENSlabelHash, setENSlabelHash] = useState("")
 
     // Get wallet
-    const provider = new ethers.providers.Web3Provider(ethereum);
+    const provider = new ethers.providers.Web3Provider(ethereum,'any');
     const signer = provider.getSigner();
     // ENS smartcontract to register a new domain
     const ensController = new ethers.Contract(contractAddressENS, contractABIens, signer); 
 
     // Get ENS domain infos
     // Called automatically each time var ENSdomainInput is refreshed
-    CheckENS(ENSdomainInput, ensController, isLoading, hasResults, setENSlabelHash, setIsENSloading, setResults, ENSlabelHash);
+    CheckENS(ENSdomainInput, ensController, isLoading, hasResults, setENSlabelHash, setIsENSloading, setResults, ENSlabelHash, provider);
 
-    const searchDomain = (e:any) => {
+    // GET user fingerprint -> https://dashboard.fingerprint.com
+    const {
+      isLoading: fingerprintIsLoading,
+      error: fingerprintError,
+      data: fingerprintData,
+    } = useVisitorData();
 
+    // check if wallet connected on startup
+    // useEffect(() => {
+    //   const test = async () => {
+    //     await ethereum.request({ method: 'eth_requestAccounts' })
+    //   }
+    //   test();
+    // },[])
+
+    const searchDomain = async (e:any) => {
+      
       // format input
       const formattedDomainInput = (domainInput.replace(/,(\s+)?$/, '')).replace(/\s+/g, "");
       setDomainInput(formattedDomainInput)
@@ -60,40 +79,45 @@ function Main(){
           return;
         }
       }
-      // get domains infos
-      if(domainList[0] != oldDomainInput){
-        setOldDomainInput(domainList[0])
-        if(!searchForUD && !searchForENS){
-          alert("Error: Both ENS and UD domains are disabled.");
-          return;
-        }
-        if(searchForUD || searchForENS){
-          setIsLoading(true);
-          setResults([]);
-        }
-        if(searchForUD){
-          setIsUDloading(true);
-        }
-        if(searchForENS){
-          setIsENSloading(true);
-        }
-        // if several domains
-        for(let i=0; i<domainList.length;i++){
+      // check if wallet connected
+      await signer.getAddress().then(() => {
 
+        // get domains infos
+        if(domainList[0] != oldDomainInput){
+          setOldDomainInput(domainList[0])
+          if(!searchForUD && !searchForENS){
+            alert("Error: Both ENS and UD domains are disabled.");
+            return;
+          }
+          if(searchForUD || searchForENS){
+            setIsLoading(true);
+            setResults([]);
+          }
           if(searchForUD){
-            checkAllUD(domainList[i], setResults, searchMetadata, setIsUDloading);
+            setIsUDloading(true);
           }
-
           if(searchForENS){
-            if(domainList[i].length >= 3){ // min 3 char for ENS domain
-              setENSdomainInput(domainList[i]+".eth");
+            setIsENSloading(true);
+          }
+          // if several domains
+          for(let i=0; i<domainList.length;i++){
+
+            if(searchForUD){
+              checkAllUD(domainList[i], setResults, searchMetadata, setIsUDloading);
             }
-            else{
-              setIsENSloading(false);
+
+            if(searchForENS){
+              if(domainList[i].length >= 3){ // min 3 char for ENS domain
+                setENSdomainInput(domainList[i]+".eth");
+              }
+              else{
+                setIsENSloading(false);
+              }
             }
           }
         }
-      }
+      })
+      .catch(() => { alert("Error: Connect your wallet."); });
     }
 
     const buy =async (index: number) => {
@@ -126,9 +150,12 @@ function Main(){
          const amount = domain.blockchain == "Polygon" ? (data.MATIC * domain.price) : (data.ETH * domain.price);
          const unit = domain.blockchain == "Polygon" ? "MATIC" : "ETH";
          // cehck if balance > domain price
-         provider.getBalance(myAddress).then((balance) => {
+         provider.getBalance(myAddress).then(async (balance) => {
           // convert a currency unit from wei to ether
           const balanceInEth = ethers.utils.formatEther(balance)
+          // if(domain.price == domain.renewalPrice){
+          //   await getENSgasPrice(results, setResults, index);
+          // }
           if(parseFloat(balanceInEth) <= amount){
             alert("Insufficient Fund: Price is " + (domain.blockchain == "Polygon" ? amount.toFixed(2).toString() : amount.toFixed(4).toString())  + " " + unit);
             return;
@@ -168,7 +195,7 @@ function Main(){
           else{
 
             const email = "clementroure@orange.fr"
-            registrarUD(domain, myAddress, email)
+            registrarUD(domain, myAddress, email, fingerprintData, fingerprintError)
           }
         });
       });
@@ -226,21 +253,39 @@ function Main(){
               //   });
               //   return dataToSort; // <-- now sorted ascending
               // })
+              
+              let _resultsUI: {isLoading: boolean}[] = []
+              for(let i=0; i<results.length;i++){
+                _resultsUI.push({isLoading: false})
+              }
+              setResultsUI(_resultsUI)
 
-              setIsLoading(false)
               setHasResults(true)
+              setIsLoading(false)
               //console.log(results)
             }
           }
         }
         if(searchForENS && !searchForUD){
           if(!isENSloading){
+            let _resultsUI: {isLoading: boolean}[] = []
+            for(let i=0; i<results.length;i++){
+              _resultsUI.push({isLoading: false})
+            }
+            setResultsUI(_resultsUI)
+
             setIsLoading(false)
             setHasResults(true)
           }
         }
         if(!searchForENS && searchForUD){
           if(!isUDloading){
+            let _resultsUI: {isLoading: boolean}[] = []
+            for(let i=0; i<results.length;i++){
+              _resultsUI.push({isLoading: false})
+            }
+            setResultsUI(_resultsUI)
+
             setIsLoading(false)
             setHasResults(true)
           }
@@ -397,13 +442,56 @@ function Main(){
                           </td>
                           <td
                               className="text-dark border-b border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium"
-                          >                                  
-                              {res.available ? ( res.provider == "ENS" ? ("$"+res.price.toFixed(2).toString()) : ("$"+res.price.toString()) ): "/"}
+                          >         
+                              {resultsUI[index].isLoading == false ?
+                                <>
+                                {res.price != res.renewalPrice ?
+                                <>       
+                                  {res.available ? ( res.provider == "ENS" ? ("$"+res.price.toFixed(2).toString()) : ("$"+res.price.toString()) ): "/"}
+                                </>        
+                                :
+                                <div>
+                                  {res.available ? ( res.provider == "ENS" ? ("$"+res.price.toFixed(2).toString()) : ("$"+res.price.toString()) )
+                                  : "/"
+                                  }
+                                  {res.available &&
+                                  <>
+                                  &nbsp;+&nbsp;
+                                  <a onClick={async () => { 
+                                    setResultsUI((_resultsUI:any)=> _resultsUI.map((_resultUI:any, i:number) => i === index ? {isLoading: true} : _resultUI));
+                                    await getENSgasPrice(results, setResults, index, resultsUI, setResultsUI);
+                                  }} 
+                                  className="cursor-pointer underline">Fees
+                                  </a>
+                                  </>
+                                  }
+                                </div>
+                                }
+                                </>
+                            :
+                            <svg aria-hidden="true" className="w-6 h-6 animate-spin text-gray-900 fill-blue-600 mx-auto" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
+                                <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+                            </svg>
+                            }
                           </td>
                           <td
                               className="text-dark border-b border-[#E8E8E8] bg-[#F3F6FF] py-5 px-2 text-center text-base font-medium"
                           >
-                              {res.provider == "ENS" ? ("$"+res.renewalPrice.toFixed(2).toString()) : "/"}
+                              {res.provider == "ENS" ? 
+                              <>
+                              {resultsUI[index].isLoading == false ?
+                              ("$"+res.renewalPrice.toFixed(2).toString()) 
+                              :
+                              <svg aria-hidden="true" className="w-6 h-6 animate-spin text-gray-900 fill-blue-600 mx-auto" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
+                                <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+                              </svg>
+                              }
+                              </>
+                              : 
+                              "/"
+                              }
                           </td>
                           <td
                               className="text-dark border-b border-r border-[#E8E8E8] bg-white py-5 px-2 text-center text-base font-medium"
@@ -445,9 +533,9 @@ function Main(){
             </div>
           </div>
           {/* <div className="h-8"/> */}
-          <CSVLink data={results} separator={";"}
+          <CSVLink data={results} separator={";"} filename={domainInput}
             className="fixed z-50 bottom-4 left-4 bg-gray-900 w-10 h-10 rounded-full drop-shadow-lg flex justify-center items-center text-white text-3xl hover:bg-gray-800 opacity-80 hover:drop-shadow-2xl hover:animate-bounce duration-300">&#8659;
-            </CSVLink>
+          </CSVLink>
         </div>
         :
         <div className="mt-48">

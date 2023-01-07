@@ -1,14 +1,13 @@
 import axios from "axios";
-// OpenSea API 
+// OpenSea API - Key Needed: https://docs.opensea.io/reference/request-an-api-key
 // tokenId -> metadata associated
 // => Display all the infos in our page instead of redirecting user to the OpenSea page
 
-export const getMetadata = (_contractAddress: string, _tokenId: string) => {
+export const getMetadata = async (_contractAddress: string, _tokenId: string) => {
     const options = {
     method: 'GET',
     url: 'https://api.opensea.io/api/v1/assets',
     params: {
-        //owner: '0xbb46bE602D82F3209B6392130B5BBd40D78df339',
         token_ids: _tokenId,
         order_direction: 'desc',
         asset_contract_address: _contractAddress,
@@ -18,7 +17,7 @@ export const getMetadata = (_contractAddress: string, _tokenId: string) => {
     headers: {accept: 'application/json'}
     };  
 
-    axios
+    await axios
     .request(options)
     .then(function (response) {
         console.log(response.data);

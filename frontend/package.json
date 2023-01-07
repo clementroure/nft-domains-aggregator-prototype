@@ -4,6 +4,9 @@
   "private": true,
   "dependencies": {
     "@apollo/client": "^3.7.3",
+    "@fingerprintjs/fingerprintjs": "^3.3.6",
+    "@fingerprintjs/fingerprintjs-pro": "^3.8.1",
+    "@fingerprintjs/fingerprintjs-pro-react": "^2.2.0",
     "@rainbow-me/rainbowkit": "^0.8.1",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",

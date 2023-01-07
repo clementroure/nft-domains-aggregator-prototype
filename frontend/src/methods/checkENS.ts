@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { useEffect } from "react";
 import { domainsQuery, registrationsQuery } from "./queries";
 
-export default function CheckENS(ENSdomainInput: string, ensController:any, isLoading: boolean, hasResults: boolean, setENSlabelHash: any, setIsENSloading: any, setResults: any, ENSlabelHash: string) {
+export const CheckENS = (ENSdomainInput: string, ensController:any, isLoading: boolean, hasResults: boolean, setENSlabelHash: any, setIsENSloading: any, setResults: any, ENSlabelHash: string, provider: any) => {
 
      // ENS call 1 -> labelhash
      let { data, loading, error } = useQuery(domainsQuery, {
@@ -21,16 +21,16 @@ export default function CheckENS(ENSdomainInput: string, ensController:any, isLo
         }
         else{
             const name = ENSdomainInput.substring(0, ENSdomainInput.length-4);
-            const ethPrice = parseInt((await ensController.rentPrice(name, 31536000))._hex, 16) / (10**18);
+            // ask price to the crontarct BUT only work when wallet is on ethereum
+            //const ethPrice = parseInt((await ensController.rentPrice(name, 31536000))._hex, 16) / (10**18);
+            let basePrice = 5;
+            if(name.length == 4)
+            basePrice = 160;
+            else if(name.length == 3)
+            basePrice = 640;
 
-            await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
-            .then((res) => res.json())
-            .then((data) => {
-              const _price = parseFloat(data.USD) * ethPrice;
-
-              setResults((prevData:any) => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: new Date(), endDate: new Date(), price: _price, renewalPrice: _price, available: true, metadata: ""}, ...prevData])
-              setIsENSloading(false);
-            });
+            setResults((prevData:any) => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: new Date(), endDate: new Date(), price: basePrice, renewalPrice: basePrice, available: true, metadata: ""}, ...prevData])
+            setIsENSloading(false);
         }
      };
       const onError = (error: any) => { console.log(error) };
@@ -62,20 +62,17 @@ export default function CheckENS(ENSdomainInput: string, ensController:any, isLo
             var expiry_date = new Date(parseInt(JSON.stringify(data.registrations[0].expiryDate).slice(1, -1)) * 1000);
             let ownerAddress = data.registrations[0].registrant.id;
             let transactionID = data.registrations[0].events[0].transactionID;
+            // ask price to the crontarct BUT only work when wallet is on ethereum
+            // const ethPrice = parseInt((await ensController.rentPrice(name, 31536000))._hex, 16) / (10**18);
+            let basePrice = 5;
+            if(name.length == 4)
+            basePrice = 160;
+            else if(name.length == 3)
+            basePrice = 640;
 
-            const tokenId = getTokenId(name);
-
-            const ethPrice = parseInt((await ensController.rentPrice(name, 31536000))._hex, 16) / (10**18);
-
-            await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
-            .then((res) => res.json())
-            .then((data) => {
-              const _price = parseFloat(data.USD) * ethPrice;
-
-              setResults((prevData:any) => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: registration_date, endDate: expiry_date, price: _price, renewalPrice: _price, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + tokenId}, ...prevData]) // or link to etherscan tx
-              setIsENSloading(false);
-            });
-          }
+            setResults((prevData:any) => [{name: name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: registration_date, endDate: expiry_date, price: basePrice, renewalPrice: basePrice, available: false, metadata: "https://opensea.io/fr/assets/ethereum/0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85/" + getTokenId(name)}, ...prevData]) // or link to etherscan tx
+            setIsENSloading(false);
+        }
       };
       const onError = (error2: any) => { console.log(error2) };
       if (onCompleted || onError) {
@@ -94,5 +91,27 @@ export default function CheckENS(ENSdomainInput: string, ensController:any, isLo
         const utils = ethers.utils
         const labelHash = utils.keccak256(utils.toUtf8Bytes(_name))
         const tokenId = BigNumber.from(labelHash).toString()
+        return tokenId;
     }
+}
+
+export const getENSgasPrice = async (results: any, setResults: any, index: number, resultsUI: any, setResultsUI: any) => {
+
+  await fetch(`https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${process.env.etherscanApiKey}`)
+    .then((res) => res.json())
+    .then(async (gas) => {
+
+      const gasPrice = gas.result.ProposeGasPrice * 10**9
+      const ethPrice = parseFloat(ethers.utils.formatEther(gasPrice)) * 311000; // ens uses 311 000 gas units
+
+      await fetch(`https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD`)
+      .then((res) => res.json())
+      .then((data) => {
+        const gasPrice = parseFloat(data.USD) * ethPrice;
+        const totalPrice = results[index].price + gasPrice;
+
+        setResultsUI((_resultsUI:any)=> _resultsUI.map((_resultUI:any, i:number) => i === index ? {isLoading: false} : _resultUI));
+        setResults((_results:any)=> _results.map((_result:any, i:number) => i === index ? {name: _result.name, extension:".eth", provider: "ENS", blockchain: "Ethereum", startDate: _result.startDate, endDate: _result.endDate, price: totalPrice, renewalPrice: totalPrice + 0.0001, available: _result.available, metadata: _result.metadata} : _result));
+      });
+  });
 }
