@@ -1,1 +1,3 @@
 Blockchain domains registration
+
+Adams County, Arapahoe County, Arvada, Aurora, Boulder, Brighton, Broomfield, Castle Rock , Castle Pines, Centennial, Colorado Springs, Commerce City, Denver, Douglas County, Elizabeth, Englewood, Erie, Fort Collins, Franktown, Golden, Greeley, Greenwood Village, Highlands Ranch, Jefferson County, Ken Caryl, Lafayette, Lakewood, Larkspur, Littleton, Lone Tree, Longmont, Louisville, Loveland, Northglenn, Parker, Pueblo, Sedalia, Superior, Thornton, Westminster, Wheat Ridge, Windsor
