@@ -97,7 +97,7 @@ export const CheckENS = (ENSdomainInput: string, ensController:any, isLoading: b
 
 export const getENSgasPrice = async (results: any, setResults: any, index: number, resultsUI: any, setResultsUI: any) => {
 
-  await fetch(`https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${process.env.etherscanApiKey}`)
+  await fetch(`https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${process.env.REACT_APP_ETHERSCAN_KEY}`)
     .then((res) => res.json())
     .then(async (gas) => {
 

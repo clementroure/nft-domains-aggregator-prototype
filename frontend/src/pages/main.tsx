@@ -7,9 +7,9 @@ import Grid from "react-loading-icons/dist/esm/components/grid";
 import { ethers } from "ethers";
 import {contractAddress as contractAddressENS} from "../contracts/ens/ens_registrar_controller"
 import {contractABI as contractABIens} from "../contracts/ens/ens_registrar_controller"
-import { getMetadata } from "../methods/apiOpenSea";
-import { useVisitorData } from "@fingerprintjs/fingerprintjs-pro-react";
+import { getFingerprint } from "react-fingerprint";
 import { CheckENS, getENSgasPrice } from "../methods/checkENS";
+import { AlchemyMonitoring } from "../methods/monitoring";
 const ethereum = window.ethereum;
 
 function Main(){
@@ -35,6 +35,8 @@ function Main(){
     // variabless for ENS subgraph queries
     const [ENSdomainInput, setENSdomainInput] = useState("")
     const [ENSlabelHash, setENSlabelHash] = useState("")
+    // user email
+    const [email, setEmail] = useState("clementroure@orange.fr")
 
     // Get wallet
     const provider = new ethers.providers.Web3Provider(ethereum,'any');
@@ -45,13 +47,6 @@ function Main(){
     // Get ENS domain infos
     // Called automatically each time var ENSdomainInput is refreshed
     CheckENS(ENSdomainInput, ensController, isLoading, hasResults, setENSlabelHash, setIsENSloading, setResults, ENSlabelHash, provider);
-
-    // GET user fingerprint -> https://dashboard.fingerprint.com
-    const {
-      isLoading: fingerprintIsLoading,
-      error: fingerprintError,
-      data: fingerprintData,
-    } = useVisitorData();
 
     // check if wallet connected on startup
     // useEffect(() => {
@@ -193,9 +188,11 @@ function Main(){
           }
           // UD: Partner API: https://docs.unstoppabledomains.com/openapi/reference/#operation/PostOrders (api call)
           else{
+            // get entropy from browsers settings 
+            // verify its the same user
+            const fingerprint = await getFingerprint()
 
-            const email = "clementroure@orange.fr"
-            registrarUD(domain, myAddress, email, fingerprintData, fingerprintError)
+            registrarUD(domain, myAddress, email, fingerprint)
           }
         });
       });
@@ -538,9 +535,13 @@ function Main(){
           </CSVLink>
         </div>
         :
+        <>
         <div className="mt-48">
           <img className="h-80 opacity-20 pointer-events-none" src={icon}/>
         </div>
+
+        <button onClick={AlchemyMonitoring}>Monitor</button>
+        </>
       }
       </>
     :

@@ -1,5 +1,3 @@
-import { useVisitorData } from '@fingerprintjs/fingerprintjs-pro-react'
-
 // methode alternative sans API
 const checkSpecificUD = (domainName: string) => {
 
@@ -74,70 +72,64 @@ const checkAllUD = (domainName: string, setResults: any, searchMetadata: boolean
     UDVerifyDisponibility();
 }
 
-const registrarUD = async (_domain: any, _myAddress: string, _email: string, _fingerprintData: any, _fingerprintError: any) => {
+const registrarUD = async (_domain: any, _myAddress: string, _email: string, _fingerprint: any) => {
 
-  const resellerId = `${process.env.resellerId}`;
-  const udApiSecret = `${process.env.udApiSecret}`;
+  const resellerId = `${process.env.REACT_APP_RESELLER_ID}`;
+  const udApiSecret = `${process.env.REACT_APP_UD_KEY}`;
 
-  if (_fingerprintData) {
+  // get JWS token
+  const _res = await fetch(
+    `https://auth.unstoppabledomains.com/.well-known/jwks.json`,
+    {method: 'GET'}
+  );
+  const jws = JSON.parse(await _res.text());
+  const jws_key = jws.keys[0].n
 
-    // get JWS token
-    const _res = await fetch(
-      `https://auth.unstoppabledomains.com/.well-known/jwks.json`,
-      {method: 'GET'}
-    );
-    const jws = await _res.text();
-    console.log(jws)
-
-    const resp = await fetch(
-      //`https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders`,
-      `https://api.ud-sandbox.com/api/v2/resellers/${resellerId}/orders`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${jws}`
+  const resp = await fetch(
+    //`https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders`,
+    `https://api.ud-sandbox.com/api/v2/resellers/${resellerId}/orders`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jws_key}`
+      },
+      body: JSON.stringify({
+        payment: {
+          method: 'free',
+          // properties: {
+          //   tokenId: 'tok_1FAeVFG8PQyZCUJhJp7emswP'
+          // }
         },
-        body: JSON.stringify({
-          payment: {
-            method: 'free',
-            // properties: {
-            //   tokenId: 'tok_1FAeVFG8PQyZCUJhJp7emswP'
-            // }
-          },
-          security: [
-            {
-              type: 'fingerprintjs',
-              identifier: _fingerprintData.visitorId
-            }
-          ],
-          domains: [
-            {
-              name: _domain.name + _domain.extension,
-              ownerAddress: _myAddress,
-              //email: _email,
-              resolution: {
-                'crypto.ETH.address': _myAddress,
-                //'crypto.BTC.address': 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
-              },
-            }
-          ]
-        })
-      }
-    );
+        security: [
+          {
+            type: 'fingerprintjs',
+            identifier: _fingerprint
+          }
+        ],
+        domains: [
+          {
+            name: _domain.name + _domain.extension,
+            ownerAddress: _myAddress,
+            //email: _email,
+            resolution: {
+              'crypto.ETH.address': _myAddress,
+              //'crypto.BTC.address': 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
+            },
+          }
+        ]
+      })
+    }
+  );
 
-    const result = await resp.json();
-    console.log(result);
-  }
-  else{
-    console.log(_fingerprintError?.message)
-  }
+  const result = await resp.json();
+  console.log(result);
 }
 
 // Check if transaction has been mined
 const orderStatus = async (_orderNumber: string) => {
 
-  const resellerId = `${process.env.resellerId}`;
+  const resellerId = `${process.env.REACT_APP_RESELLER_ID}`;
 
   const resp = await fetch(
     `https://unstoppabledomains.com/api/v2/resellers/${resellerId}/orders/${_orderNumber}`,
@@ -149,3 +141,6 @@ const orderStatus = async (_orderNumber: string) => {
 }
 
 export {checkSpecificUD, checkAllUD, registrarUD, orderStatus};
+
+// Get suggestions of similars domains
+// https://docs.unstoppabledomains.com/openapi/reference/#operation/GetDomainsSuggestions
