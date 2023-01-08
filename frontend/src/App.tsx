@@ -12,9 +12,9 @@ const client = new ApolloClient({
 });
 
 // Create 433 warnings in console
-Moralis.start({
-  apiKey: `${process.env.REACT_APP_MORALIS_KEY}`
-});
+// Moralis.start({
+//   apiKey: `${process.env.REACT_APP_MORALIS_KEY}`
+// });
 
 // Init Alchemy
 const settings = {

@@ -9,7 +9,13 @@ import {contractAddress as contractAddressENS} from "../contracts/ens/ens_regist
 import {contractABI as contractABIens} from "../contracts/ens/ens_registrar_controller"
 import { getFingerprint } from "react-fingerprint";
 import { CheckENS, getENSgasPrice } from "../methods/checkENS";
-import { AlchemyMonitoring } from "../methods/monitoring";
+import { Elements } from "@stripe/react-stripe-js";
+import {loadStripe, Stripe} from '@stripe/stripe-js';
+import CheckoutForm from "../stripe/checkoutForm";
+// stripe (test values)
+const clientSecret = "pi_3LXLRHFuKXi25RGc1OPGpaWZ_secret_3xOxozTIOqr60uECWEkp5w7BF"
+const stripePromise = loadStripe(`${process.env.REACT_APP_STRIPE_KEY}`);
+// eth
 const ethereum = window.ethereum;
 
 function Main(){
@@ -289,6 +295,14 @@ function Main(){
         }
     },[results])
 
+    const [stripePopupVisible, setStripePopupVisible] = useState(false)
+    const stripePopupRef = useRef<HTMLDivElement>(null)
+    const closeStripePopup = (e:any)=>{
+      if(stripePopupRef.current && stripePopupVisible && !stripePopupRef.current.contains(e.target) && e.target.id == 'quit' && e.target.tagName.toLowerCase() != 'button'){
+        setStripePopupVisible(false)
+      }
+     }
+
     const [isSettingsVisible, setIsSettingsVisible] = useState(false)
     // Settings popup visibility handler
     const settingsRef = useRef<HTMLInputElement>(null);
@@ -300,6 +314,9 @@ function Main(){
         if(!settingsRef.current?.contains(e.target)){
             // click outside button
             setIsSettingsVisible(false)
+        }
+        if(stripePopupVisible){
+          closeStripePopup(e);
         }
     }
 
@@ -355,6 +372,16 @@ function Main(){
 
       </div>
     </nav>
+
+    {stripePopupVisible &&
+    <div id="quit" className="h-full w-full absolute backdrop-blur-sm z-10">
+        <div ref={stripePopupRef} className="w-full max-w-md p-4 m-auto rounded-md mt-48 lg:mt-60 shadow-md bg-gray-800">
+          <Elements stripe={stripePromise} options={{clientSecret, appearance: {theme: "night", labels: 'floating', variables: {colorPrimary: "#141414"}}}}>
+            <CheckoutForm />
+          </Elements>
+        </div>
+    </div>
+    }
 
     {!isLoading ?
       <>
