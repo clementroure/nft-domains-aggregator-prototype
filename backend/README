@@ -1,0 +1,8 @@
+debug
+
+cd backend
+npm start
+
+live
+
+Host backend on a linux server like Digital Ocean Droplet
