@@ -87,7 +87,7 @@ const wagmiClient = createClient({
 
 root.render(
   <WagmiConfig client={wagmiClient}>
-    <RainbowKitProvider chains={chains} theme={myLightTheme}>
+    <RainbowKitProvider chains={chains} theme={myDarkTheme}>
       <App />
     </RainbowKitProvider>
   </WagmiConfig>

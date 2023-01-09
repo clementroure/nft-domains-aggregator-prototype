@@ -1,7 +1,7 @@
 import Moralis from "moralis";
 import { EvmChain } from "@moralisweb3/common-evm-utils";
-import {contractAddress as contractAddressENS} from "../contracts/ens/ens_registrar_controller"
-import {contractABI as contractABIens} from "../contracts/ens/ens_registrar_controller"
+import {contractAddress as contractAddressENS} from "../../contracts/ens/ens_registrar_controller"
+import {contractABI as contractABIens} from "../../contracts/ens/ens_registrar_controller"
 import { ethers } from "ethers";
 // all this have to be on the backend
 
