@@ -14,6 +14,7 @@ import { PaymentSelectionPopup } from "../widgets/popups/PaymentSelectionPopup";
 import { Table } from "../widgets/Table";
 import { Navbar } from "../widgets/navbar";
 import { switchToEthereum, switchToPolygon, addPolygonNetwork } from "../methods/switchBlockchain";
+import { MetadataPopup } from "../widgets/popups/MetadataPopup";
 // stripe (test values)
 const clientSecret = "pi_3LXLRHFuKXi25RGc1OPGpaWZ_secret_3xOxozTIOqr60uECWEkp5w7BF"
 const stripePromise = loadStripe(`${process.env.REACT_APP_STRIPE_KEY}`);
@@ -291,6 +292,13 @@ function Main(){
          setPaymentSelectionPopupVisible(false)
        }
       }
+    const [metadataPopupVisible, setMetadataPopupVisible] = useState(false)
+    const metadataPopupRef = useRef<HTMLDivElement>(null)
+    const closeMetadataPopup = (e:any)=>{
+      if(e.target.id == 'quit' && e.target.tagName.toLowerCase() != 'button'){
+        setMetadataPopupVisible(false)
+      }
+    }
 
     const [isSettingsVisible, setIsSettingsVisible] = useState(false)
     // Settings popup visibility handler
@@ -310,6 +318,9 @@ function Main(){
         if(!paymentSelectionPopupRef.current?.contains(e.target)){
           closePaymentSelectionPopup(e);
         }
+        if(!metadataPopupRef.current?.contains(e.target)){
+          closeMetadataPopup(e);
+        }
     }
 
  return (
@@ -324,6 +335,10 @@ function Main(){
     domainSelected={domainSelected} />
   }
 
+  {metadataPopupVisible && 
+   <MetadataPopup  metadataPopupRef={metadataPopupRef} domainSelected={domainSelected}/>
+  }
+
   <div className='grid place-items-center'>
     <Navbar isSettingsVisible={isSettingsVisible} setIsSettingsVisible={setIsSettingsVisible} settingsRef={settingsRef} 
     searchMetadata={searchMetadata} setSearchMetadata={setSearchMetadata} searchDomain={searchDomain} domainInput={domainInput} 
@@ -336,7 +351,7 @@ function Main(){
 
         <div className="container mx-auto lg:overflow-x-hidden mt-14">
           <Table results={results} setResults={setResults} resultsUI={resultsUI} setResultsUI={setResultsUI} searchMetadata={searchMetadata} 
-          buyBtn={buyBtn}/>
+          buyBtn={buyBtn} setMetadataPopupVisible={setMetadataPopupVisible} setDomainSelected={setDomainSelected}/>
 
           <CSVLink data={results} separator={";"} filename={domainInput}
             className="fixed z-50 bottom-4 left-4 bg-gray-900 w-10 h-10 rounded-full drop-shadow-lg flex justify-center items-center text-white text-3xl hover:bg-gray-800 opacity-80 hover:drop-shadow-2xl hover:animate-bounce duration-300">&#8659;

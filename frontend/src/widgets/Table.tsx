@@ -146,9 +146,9 @@ import { getENSgasPrice } from "../methods/api/checkENS";
                         {res.metadata != "" ?
                         <>
                         {res.extension != ".zil" ?
-                        <a href={res.metadata} target="_blank" className="cursor-pointer hover:underline">
+                        <button onClick={() => {props.setDomainSelected(props.results[index]); props.setMetadataPopupVisible(true);}} className="cursor-pointer hover:underline">
                         Taken
-                        </a>
+                        </button>
                         :
                         <>
                         Taken
