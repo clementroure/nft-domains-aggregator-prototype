@@ -123,66 +123,60 @@ function Main(){
       .catch(() => { alert("Error: Connect your wallet."); });
     }
 
-    const [chainId_buying, setChainId_buying] = useState(0);
-    const [domain_buying, setDomain_buying] = useState<{name: string, extension: string, available: boolean, provider: string, blockchain: string, price: number, renewalPrice: number, startDate: Date, endDate: Date, metadata: string}>()
+    const [domainSelected, setDomainSelected] = useState<{name: string, extension: string, available: boolean, provider: string, blockchain: string, price: number, renewalPrice: number, startDate: Date, endDate: Date, metadata: string}>()
     const buyBtn = async (index: number) => {
 
       const domain = results[index];
-      setDomain_buying(domain);
-
-      const { chainId } = await provider.getNetwork();
-      setChainId_buying(chainId);
+      setDomainSelected(domain);
 
       if(domain.provider == "ENS"){
-        buyCrypto();
+        buyCrypto(domain);
       }
       else{
         setPaymentSelectionPopupVisible(true);
       }
     }
 
-    const buyCrypto =async () => {
+    const buyCrypto = async (_domain:any) => {
 
+      const { chainId } = await provider.getNetwork();
       const myAddress = await signer.getAddress();
 
       // check if on polygon network. if not switch
-      if(domain_buying?.blockchain! == "Polygon" && chainId_buying != 137){
+      if(_domain?.blockchain! == "Polygon" && chainId != 137){
         try{
-          switchToPolygon(ethereum, setChainId_buying);
+          switchToPolygon(ethereum);
         }
         catch(e){
           // try by adding the network to wallet
           addPolygonNetwork(ethereum);
-          switchToPolygon(ethereum, setChainId_buying);
+          switchToPolygon(ethereum);
         }
         return;
       }
       // check if on ethereum network
-      if(domain_buying!.blockchain == "Ethereum" && chainId_buying != 1){
-        switchToEthereum(ethereum, setChainId_buying);
+      if(_domain!.blockchain == "Ethereum" && chainId != 1){
+        switchToEthereum(ethereum);
         return;
       }
       // get MATIC and ETH price
-      await fetch(domain_buying?.blockchain == "Polygon" ? `https://min-api.cryptocompare.com/data/price?fsym=USD&tsyms=MATIC` : `https://min-api.cryptocompare.com/data/price?fsym=USD&tsyms=ETH`)
+      await fetch(_domain?.blockchain == "Polygon" ? `https://min-api.cryptocompare.com/data/price?fsym=USD&tsyms=MATIC` : `https://min-api.cryptocompare.com/data/price?fsym=USD&tsyms=ETH`)
       .then((res) => res.json())
       .then((data) => {
-         const amount = domain_buying?.blockchain == "Polygon" ? (data.MATIC * domain_buying?.price) : (data.ETH * domain_buying?.price!);
-         const unit = domain_buying?.blockchain == "Polygon" ? "MATIC" : "ETH";
+         const amount = _domain?.blockchain == "Polygon" ? (data.MATIC * _domain?.price) : (data.ETH * _domain?.price!);
+         const unit = _domain?.blockchain == "Polygon" ? "MATIC" : "ETH";
          // cehck if balance > domain price
          provider.getBalance(myAddress).then(async (balance) => {
           // convert a currency unit from wei to ether
           const balanceInEth = ethers.utils.formatEther(balance)
-          // if(domain.price == domain.renewalPrice){
-          //   await getENSgasPrice(results, setResults, index);
-          // }
           if(parseFloat(balanceInEth) <= amount){
-            alert("Insufficient Fund: Price is " + (domain_buying?.blockchain == "Polygon" ? amount.toFixed(2).toString() : amount.toFixed(4).toString())  + " " + unit);
+            alert("Insufficient Fund: Price is " + (_domain?.blockchain == "Polygon" ? amount.toFixed(2).toString() : amount.toFixed(4).toString())  + " " + unit);
             return;
           }
           //// REGISTRATION ////
 
           // ENS: https://docs.ens.domains/dapp-developer-guide/registering-and-renewing-names (smart contract call) (testnet: Goerli, same address)
-          if(domain_buying?.provider == "ENS"){
+          if(_domain?.provider == "ENS"){
 
             const controller = new ethers.Contract(contractAddressENS, contractABIens, signer); 
             const register = async (name: string, owner:any, duration:any) => {
@@ -208,7 +202,7 @@ function Main(){
               }, 60000);
             }
 
-            register(domain_buying?.name, myAddress, 31536000); // 1 year
+            register(_domain?.name, myAddress, 31536000); // 1 year
           }
           // UD: Partner API: https://docs.unstoppabledomains.com/openapi/reference/#operation/PostOrders (api call)
           else{
@@ -216,7 +210,7 @@ function Main(){
             // verify its the same user
             const fingerprint = await getFingerprint()
 
-            registrarUD(domain_buying, myAddress, email, fingerprint)
+            registrarUD(_domain, myAddress, email, fingerprint)
           }
         });
       });
@@ -325,8 +319,9 @@ function Main(){
   }
 
   {paymentSelectionPopupVisible && 
-   <PaymentSelectionPopup paymentSelectionPopupRef={paymentSelectionPopupRef} buyCrypto={buyCrypto} setPaymentSelectionPopupVisible={setPaymentSelectionPopupVisible} 
-   setStripePopupVisible={setStripePopupVisible} domain_buying={domain_buying}/>
+   <PaymentSelectionPopup paymentSelectionPopupRef={paymentSelectionPopupRef} buyCrypto={buyCrypto} 
+    setPaymentSelectionPopupVisible={setPaymentSelectionPopupVisible} setStripePopupVisible={setStripePopupVisible} 
+    domainSelected={domainSelected} />
   }
 
   <div className='grid place-items-center'>
