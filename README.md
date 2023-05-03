@@ -14,4 +14,4 @@
 
 <img src="https://user-images.githubusercontent.com/13381610/235979361-093643e9-23ce-40f0-bfa3-3c9cf86e716d.png" width="1000">
 
-The final version of this project is located here: https://github.com/clementroure/NFT-Domains-Aggregator/edit/master/README.md
+The final version of this project is located here: https://github.com/clementroure/NFT-Domains-Aggregator
